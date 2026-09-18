@@ -9,15 +9,19 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd: Record<"up" | "down" | "left" | "right", Phaser.Input.Keyboard.Key>;
   private facing: Facing = "down";
-  private bob = 0;
+  private shadow: Phaser.GameObjects.Image;
+  private idleBob = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y, "player-down");
+    super(scene, x, y, "player-down-0");
     scene.add.existing(this);
     scene.physics.add.existing(this);
+    this.setDepth(1);
+
+    this.shadow = scene.add.image(x, y + 17, "player-shadow").setDepth(0.5);
 
     this.setCollideWorldBounds(true);
-    this.setSize(20, 16).setOffset(6, 20);
+    this.setSize(18, 10).setOffset(7, 29);
 
     const keyboard = scene.input.keyboard!;
     this.cursors = keyboard.createCursorKeys();
@@ -27,6 +31,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       left: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
       right: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
+
+    this.play("idle-down");
   }
 
   getFacing(): Facing {
@@ -87,14 +93,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       } else {
         this.facing = dirY > 0 ? "down" : "up";
       }
-      this.setTexture(`player-${this.facing}`);
-
-      this.bob += delta * 0.02;
-      this.setScale(1, 1 + Math.sin(this.bob) * 0.04);
-    } else {
-      this.bob = 0;
+      this.play(`walk-${this.facing}`, true);
+      this.idleBob = 0;
       this.setScale(1, 1);
+    } else {
+      this.play(`idle-${this.facing}`, true);
+      // Gentle idle "breathing" so the character never looks frozen.
+      this.idleBob += delta * 0.004;
+      this.setScale(1, 1 + Math.sin(this.idleBob) * 0.015);
     }
+
+    this.shadow.setPosition(this.x, this.y + 17);
+    this.shadow.setScale(moving ? 0.9 : 1);
   }
 
   isMoving(): boolean {

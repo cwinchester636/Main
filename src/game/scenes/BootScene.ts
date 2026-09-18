@@ -27,43 +27,98 @@ export class BootScene extends Phaser.Scene {
     return this.make.graphics({ x: 0, y: 0 }, false);
   }
 
+  /**
+   * Chibi-proportioned player: big head, stubby legs that alternate between
+   * 3 frames for a walk cycle, blush + a hair cowlick for personality.
+   * Generates player-{down,up,left,right}-{0,1,2} and registers a
+   * walk/idle animation per direction.
+   */
   private makePlayerTextures(): void {
-    const body = 0x3a6ea5;
-    const skin = 0xe8b98a;
-    const dirs: Record<string, () => void> = {
-      down: () => {
+    const skin = 0xffd9a8;
+    const hair = 0x4a3728;
+    const shirt = 0x4f8fdb;
+    const shirtShade = 0x3d73b8;
+    const blush = 0xff9eb5;
+    const legColor = 0x2e2e38;
+    const eye = 0x2b2b2b;
+
+    const cx = 16;
+    const headCy = 12;
+    const headR = 10;
+
+    const dirs: Array<"down" | "up" | "left" | "right"> = ["down", "up", "left", "right"];
+
+    for (const dir of dirs) {
+      for (let frame = 0; frame < 3; frame++) {
         const g = this.g();
-        g.fillStyle(body, 1).fillRoundedRect(6, 14, 20, 22, 4);
-        g.fillStyle(skin, 1).fillCircle(16, 10, 9);
-        g.fillStyle(0x222222, 1).fillCircle(12, 9, 1.6).fillCircle(20, 9, 1.6);
-        g.generateTexture("player-down", 32, 40);
+        // Frames 1 & 2 are mid-step: legs splay apart and the whole body
+        // lifts 1px, giving a little bounce; frame 0 is the neutral stance.
+        const lift = frame === 0 ? 0 : 1;
+        const splay = frame === 1 ? 2 : frame === 2 ? -2 : 0;
+        const headY = headCy - lift;
+        const bodyTop = 20 - lift;
+
+        // Legs (drawn first so the body/head overlap them).
+        g.fillStyle(legColor, 1);
+        g.fillRoundedRect(cx - 6 - splay, 32, 5, 7, 2);
+        g.fillRoundedRect(cx + 1 + splay, 32, 5, 7, 2);
+
+        // Body.
+        g.fillStyle(shirt, 1);
+        g.fillRoundedRect(cx - 9, bodyTop, 18, 13, 5);
+        g.fillStyle(shirtShade, 1);
+        g.fillRoundedRect(cx - 9, bodyTop + 8, 18, 5, { tl: 0, tr: 0, bl: 5, br: 5 });
+
+        // Head + back-hair cap.
+        g.fillStyle(hair, 1);
+        g.fillEllipse(cx, headY - headR + 3, headR * 2 + 2, 11);
+        g.fillStyle(skin, 1);
+        g.fillCircle(cx, headY, headR);
+
+        // Cowlick.
+        g.fillStyle(hair, 1);
+        g.fillTriangle(cx - 2, headY - headR + 2, cx + 2, headY - headR + 2, cx, headY - headR - 5);
+
+        // Face, direction-dependent (back of head shows no face when facing up).
+        if (dir === "down") {
+          g.fillStyle(eye, 1).fillCircle(cx - 4, headY, 1.6).fillCircle(cx + 4, headY, 1.6);
+          g.fillStyle(blush, 0.85).fillCircle(cx - 7, headY + 3, 2).fillCircle(cx + 7, headY + 3, 2);
+        } else if (dir === "left") {
+          g.fillStyle(eye, 1).fillCircle(cx - 5, headY, 1.7);
+          g.fillStyle(blush, 0.85).fillCircle(cx - 6, headY + 4, 1.8);
+        } else if (dir === "right") {
+          g.fillStyle(eye, 1).fillCircle(cx + 5, headY, 1.7);
+          g.fillStyle(blush, 0.85).fillCircle(cx + 6, headY + 4, 1.8);
+        }
+
+        g.generateTexture(`player-${dir}-${frame}`, 32, 40);
         g.destroy();
-      },
-      up: () => {
-        const g = this.g();
-        g.fillStyle(body, 1).fillRoundedRect(6, 14, 20, 22, 4);
-        g.fillStyle(skin, 1).fillCircle(16, 10, 9);
-        g.generateTexture("player-up", 32, 40);
-        g.destroy();
-      },
-      left: () => {
-        const g = this.g();
-        g.fillStyle(body, 1).fillRoundedRect(6, 14, 20, 22, 4);
-        g.fillStyle(skin, 1).fillCircle(14, 10, 9);
-        g.fillStyle(0x222222, 1).fillCircle(11, 9, 1.6);
-        g.generateTexture("player-left", 32, 40);
-        g.destroy();
-      },
-      right: () => {
-        const g = this.g();
-        g.fillStyle(body, 1).fillRoundedRect(6, 14, 20, 22, 4);
-        g.fillStyle(skin, 1).fillCircle(18, 10, 9);
-        g.fillStyle(0x222222, 1).fillCircle(21, 9, 1.6);
-        g.generateTexture("player-right", 32, 40);
-        g.destroy();
-      },
-    };
-    Object.values(dirs).forEach((fn) => fn());
+      }
+    }
+
+    for (const dir of dirs) {
+      this.anims.create({
+        key: `walk-${dir}`,
+        frames: [
+          { key: `player-${dir}-1` },
+          { key: `player-${dir}-0` },
+          { key: `player-${dir}-2` },
+          { key: `player-${dir}-0` },
+        ],
+        frameRate: 8,
+        repeat: -1,
+      });
+      this.anims.create({
+        key: `idle-${dir}`,
+        frames: [{ key: `player-${dir}-0` }],
+        frameRate: 1,
+      });
+    }
+
+    const shadow = this.g();
+    shadow.fillStyle(0x000000, 0.28).fillEllipse(12, 6, 22, 9);
+    shadow.generateTexture("player-shadow", 24, 12);
+    shadow.destroy();
   }
 
   private makeTreeTextures(): void {
