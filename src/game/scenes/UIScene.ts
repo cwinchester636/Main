@@ -9,12 +9,16 @@ import { ITEM_DEFINITIONS, type ItemId } from "../data/items";
 import { RECIPES } from "../data/recipes";
 import type { SkillGainEvent, SkillLevelUpEvent, SkillSystem } from "../systems/SkillSystem";
 import type { InventorySystem } from "../systems/InventorySystem";
+import type { TouchInput } from "../systems/TouchInput";
 
 const PANEL_WIDTH = 210;
+const JOYSTICK_RADIUS = 46;
+const INTERACT_BUTTON_RADIUS = 40;
 
 export class UIScene extends Phaser.Scene {
   private skills!: SkillSystem;
   private inventory!: InventorySystem;
+  private touchInput!: TouchInput;
 
   private skillRows = new Map<
     SkillId,
@@ -30,6 +34,15 @@ export class UIScene extends Phaser.Scene {
   private toastQueue: SkillLevelUpEvent[] = [];
   private toastBusy = false;
 
+  private touchControlsContainer!: Phaser.GameObjects.Container;
+  private joystickCenter = new Phaser.Math.Vector2();
+  private joystickThumb!: Phaser.GameObjects.Arc;
+  private joystickZone!: Phaser.GameObjects.Zone;
+  private interactButton!: Phaser.GameObjects.Arc;
+  private joystickPointerId: number | null = null;
+  private touchControlsEnabled = false;
+  private touchToggleText!: Phaser.GameObjects.Text;
+
   constructor() {
     super("UI");
   }
@@ -37,11 +50,13 @@ export class UIScene extends Phaser.Scene {
   create(): void {
     this.skills = this.game.registry.get("skills");
     this.inventory = this.game.registry.get("inventory");
+    this.touchInput = this.game.registry.get("touchInput");
 
     this.buildSkillsPanel();
     this.buildPrompt();
     this.buildInventoryBar();
     this.buildCraftingPanel();
+    this.buildTouchControls();
 
     this.skills.on("xpGained", (e: SkillGainEvent) => this.refreshSkillRow(e.skillId));
     this.skills.on("levelUp", (e: SkillLevelUpEvent) => this.queueToast(e));
@@ -347,5 +362,133 @@ export class UIScene extends Phaser.Scene {
 
       this.craftingPanel.add([nameLine, inputLine, craftBtn]);
     });
+  }
+
+  // ---------- Touch controls ----------
+
+  private buildTouchControls(): void {
+    const { width, height } = this.scale;
+    const hasTouch = this.sys.game.device.input.touch;
+
+    this.joystickCenter.set(110, height - 150);
+
+    const joystickBase = this.add
+      .circle(this.joystickCenter.x, this.joystickCenter.y, JOYSTICK_RADIUS, 0xffffff, 0.12)
+      .setStrokeStyle(2, 0xffffff, 0.3)
+      .setScrollFactor(0);
+    this.joystickThumb = this.add
+      .circle(this.joystickCenter.x, this.joystickCenter.y, 22, 0xffffff, 0.35)
+      .setScrollFactor(0);
+
+    // Generous invisible catch area, bigger than the visible base, so a
+    // finger landing near the joystick still grabs it.
+    this.joystickZone = this.add
+      .zone(this.joystickCenter.x, this.joystickCenter.y, JOYSTICK_RADIUS * 2.6, JOYSTICK_RADIUS * 2.6)
+      .setScrollFactor(0);
+    this.joystickZone.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (this.joystickPointerId !== null) return;
+      this.joystickPointerId = pointer.id;
+      this.updateJoystick(pointer);
+    });
+
+    this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
+      if (pointer.id === this.joystickPointerId) this.updateJoystick(pointer);
+    });
+    this.input.on("pointerup", (pointer: Phaser.Input.Pointer) =>
+      this.releaseJoystickIfMatching(pointer),
+    );
+    this.input.on("pointerupoutside", (pointer: Phaser.Input.Pointer) =>
+      this.releaseJoystickIfMatching(pointer),
+    );
+
+    this.interactButton = this.add
+      .circle(width - 80, height - 150, INTERACT_BUTTON_RADIUS, 0xffe066, 0.25)
+      .setStrokeStyle(2, 0xffe066, 0.6)
+      .setScrollFactor(0);
+    const interactLabel = this.add
+      .text(width - 80, height - 150, "E", {
+        fontFamily: "monospace",
+        fontSize: "20px",
+        color: "#ffe066",
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+    this.interactButton.on("pointerdown", () => {
+      this.touchInput.pressInteract();
+      this.interactButton.setFillStyle(0xffe066, 0.55);
+    });
+    this.interactButton.on("pointerup", () => this.interactButton.setFillStyle(0xffe066, 0.25));
+    this.interactButton.on("pointerout", () => this.interactButton.setFillStyle(0xffe066, 0.25));
+
+    this.touchControlsContainer = this.add.container(0, 0, [
+      joystickBase,
+      this.joystickThumb,
+      this.joystickZone,
+      this.interactButton,
+      interactLabel,
+    ]);
+
+    this.touchToggleText = this.add
+      .text(12, 12, "", {
+        fontFamily: "monospace",
+        fontSize: "10px",
+        color: "#aaaaaa",
+        backgroundColor: "#00000066",
+        padding: { x: 6, y: 3 },
+      })
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.setTouchControlsEnabled(!this.touchControlsEnabled));
+
+    this.setTouchControlsEnabled(hasTouch);
+  }
+
+  private updateJoystick(pointer: Phaser.Input.Pointer): void {
+    const offset = new Phaser.Math.Vector2(
+      pointer.x - this.joystickCenter.x,
+      pointer.y - this.joystickCenter.y,
+    );
+    const dist = Math.min(offset.length(), JOYSTICK_RADIUS);
+    const clamped = offset.lengthSq() > 0 ? offset.clone().normalize().scale(dist) : offset;
+    this.joystickThumb.setPosition(
+      this.joystickCenter.x + clamped.x,
+      this.joystickCenter.y + clamped.y,
+    );
+    this.touchInput.setMove(clamped.x / JOYSTICK_RADIUS, clamped.y / JOYSTICK_RADIUS);
+  }
+
+  private releaseJoystickIfMatching(pointer: Phaser.Input.Pointer): void {
+    if (pointer.id !== this.joystickPointerId) return;
+    this.joystickPointerId = null;
+    this.joystickThumb.setPosition(this.joystickCenter.x, this.joystickCenter.y);
+    this.touchInput.clearMove();
+  }
+
+  private setTouchControlsEnabled(enabled: boolean): void {
+    this.touchControlsEnabled = enabled;
+    this.touchControlsContainer.setVisible(enabled);
+    if (enabled) {
+      this.joystickZone.setInteractive();
+      // Arc/Shape game objects don't auto-compute a hit area from their
+      // radius, so the default rectangular hit area silently misses clicks
+      // unless we hand it an explicit circular one.
+      this.interactButton.setInteractive({
+        hitArea: new Phaser.Geom.Circle(
+          INTERACT_BUTTON_RADIUS,
+          INTERACT_BUTTON_RADIUS,
+          INTERACT_BUTTON_RADIUS,
+        ),
+        hitAreaCallback: Phaser.Geom.Circle.Contains,
+        useHandCursor: true,
+      });
+    } else {
+      this.joystickZone.disableInteractive();
+      this.interactButton.disableInteractive();
+      this.joystickPointerId = null;
+      this.touchInput.clearMove();
+    }
+    this.touchToggleText.setText(
+      enabled ? "[hide touch controls]" : "[show touch controls]",
+    );
   }
 }

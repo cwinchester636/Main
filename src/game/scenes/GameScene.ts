@@ -5,6 +5,7 @@ import { TrainingDummy } from "../entities/TrainingDummy";
 import { CraftingStation } from "../entities/CraftingStation";
 import type { SkillSystem } from "../systems/SkillSystem";
 import type { InventorySystem } from "../systems/InventorySystem";
+import type { TouchInput } from "../systems/TouchInput";
 import { loadSave, writeSave } from "../systems/SaveSystem";
 
 const WORLD_WIDTH = 1920;
@@ -16,6 +17,7 @@ type Interactable = ResourceNode | TrainingDummy | CraftingStation;
 export class GameScene extends Phaser.Scene {
   private skills!: SkillSystem;
   private inventory!: InventorySystem;
+  private touchInput!: TouchInput;
   private player!: Player;
   private nodes: ResourceNode[] = [];
   private dummy!: TrainingDummy;
@@ -30,6 +32,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.skills = this.game.registry.get("skills");
     this.inventory = this.game.registry.get("inventory");
+    this.touchInput = this.game.registry.get("touchInput");
 
     const save = loadSave();
 
@@ -139,7 +142,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    this.player.update(delta);
+    this.player.update(delta, this.touchInput.moveVector);
 
     for (const node of this.nodes) {
       const result = node.update(delta);
@@ -188,7 +191,8 @@ export class GameScene extends Phaser.Scene {
 
     this.events.emit("interactTarget", this.describeTarget(closest));
 
-    const pressedE = Phaser.Input.Keyboard.JustDown(this.keyE);
+    const pressedE =
+      Phaser.Input.Keyboard.JustDown(this.keyE) || this.touchInput.consumeInteract();
     if (pressedE && closest) {
       if (closest instanceof ResourceNode) {
         closest.tryStartAction();

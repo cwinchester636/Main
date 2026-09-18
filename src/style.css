@@ -14,12 +14,16 @@ body {
   overflow: hidden;
 }
 
+/*
+ * No flex centering here: Phaser's Scale.CENTER_BOTH already centers the
+ * canvas itself via inline margins. Combining the two double-offsets the
+ * canvas whenever it's letterboxed (stacking flex centering on top of
+ * Phaser's own margin-based centering).
+ */
 #app {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100vw;
   height: 100vh;
+  overflow: hidden;
 }
 
 #app canvas {

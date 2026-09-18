@@ -53,25 +53,39 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return p;
   }
 
-  update(delta: number): void {
-    const left = this.cursors.left.isDown || this.wasd.left.isDown;
-    const right = this.cursors.right.isDown || this.wasd.right.isDown;
-    const up = this.cursors.up.isDown || this.wasd.up.isDown;
-    const down = this.cursors.down.isDown || this.wasd.down.isDown;
+  /**
+   * @param touchVector Analog direction from an on-screen joystick, magnitude
+   *   0..1. When it has any length it overrides keyboard input for this frame.
+   */
+  update(delta: number, touchVector?: Phaser.Math.Vector2): void {
+    let dirX: number;
+    let dirY: number;
+    let velocity: Phaser.Math.Vector2;
 
-    const vx = (right ? 1 : 0) - (left ? 1 : 0);
-    const vy = (down ? 1 : 0) - (up ? 1 : 0);
-    const moving = vx !== 0 || vy !== 0;
+    if (touchVector && touchVector.lengthSq() > 0.0001) {
+      dirX = touchVector.x;
+      dirY = touchVector.y;
+      velocity = touchVector.clone().scale(SPEED);
+    } else {
+      const left = this.cursors.left.isDown || this.wasd.left.isDown;
+      const right = this.cursors.right.isDown || this.wasd.right.isDown;
+      const up = this.cursors.up.isDown || this.wasd.up.isDown;
+      const down = this.cursors.down.isDown || this.wasd.down.isDown;
 
-    const velocity = new Phaser.Math.Vector2(vx, vy);
-    if (moving) velocity.normalize().scale(SPEED);
+      dirX = (right ? 1 : 0) - (left ? 1 : 0);
+      dirY = (down ? 1 : 0) - (up ? 1 : 0);
+      velocity = new Phaser.Math.Vector2(dirX, dirY);
+      if (dirX !== 0 || dirY !== 0) velocity.normalize().scale(SPEED);
+    }
+
+    const moving = dirX !== 0 || dirY !== 0;
     this.setVelocity(velocity.x, velocity.y);
 
     if (moving) {
-      if (Math.abs(vx) > Math.abs(vy)) {
-        this.facing = vx > 0 ? "right" : "left";
+      if (Math.abs(dirX) > Math.abs(dirY)) {
+        this.facing = dirX > 0 ? "right" : "left";
       } else {
-        this.facing = vy > 0 ? "down" : "up";
+        this.facing = dirY > 0 ? "down" : "up";
       }
       this.setTexture(`player-${this.facing}`);
 
