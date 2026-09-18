@@ -22,7 +22,7 @@ export default function CardPicker({ title, excludeIds, onAdd, onClose }) {
         <input
           type="text"
           className="text-input"
-          placeholder="Search by card or set name…"
+          placeholder="Search by card, set, or set number…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           autoFocus
@@ -61,7 +61,7 @@ export default function CardPicker({ title, excludeIds, onAdd, onClose }) {
             >
               <span>
                 <span className="picker-row-name">{card.name}</span>
-                <span className="picker-row-set">{card.set}</span>
+                <span className="picker-row-set">{card.set} · {card.number}</span>
               </span>
               <span className="picker-row-add" aria-hidden="true">+</span>
             </button>

@@ -8,7 +8,7 @@ export default function CardChip({ card, onRemove, compact = false }) {
       <span className="card-chip-emoji" aria-hidden="true">{gameEmoji(card.game)}</span>
       <span className="card-chip-text">
         <span className="card-chip-name">{card.name}</span>
-        <span className="card-chip-set">{card.set}</span>
+        <span className="card-chip-set">{card.set} · {card.number}</span>
       </span>
       {onRemove && (
         <button
