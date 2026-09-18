@@ -23,8 +23,55 @@ export class BootScene extends Phaser.Scene {
     this.makeVillageTextures();
     this.makeNpcTextures();
 
+    this.pixelateAllTextures();
+
     this.scene.start("Game");
     this.scene.launch("UI");
+  }
+
+  /**
+   * Every sprite above is drawn with smooth vector shapes (circles, rounded
+   * rects), which doesn't read as pixel art even with nearest-neighbor
+   * scaling. Rather than hand-author a low-res bitmap for every texture,
+   * shrink each generated texture down and blow it back up with smoothing
+   * off — the classic "mosaic filter" trick — so every sprite ends up as
+   * chunky, consistently-sized blocks instead of smooth curves.
+   */
+  private pixelateAllTextures(pixelSize = 3): void {
+    for (const key of this.textures.getTextureKeys()) {
+      if (key.startsWith("__")) continue;
+      this.pixelateTexture(key, pixelSize);
+    }
+  }
+
+  private pixelateTexture(key: string, pixelSize: number): void {
+    const texture = this.textures.get(key) as Phaser.Textures.CanvasTexture;
+    const source = texture.getSourceImage();
+    if (!(source instanceof HTMLCanvasElement)) return;
+    const w = source.width;
+    const h = source.height;
+    if (w < 1 || h < 1) return;
+
+    const smallW = Math.max(1, Math.round(w / pixelSize));
+    const smallH = Math.max(1, Math.round(h / pixelSize));
+
+    const small = document.createElement("canvas");
+    small.width = smallW;
+    small.height = smallH;
+    const sctx = small.getContext("2d")!;
+    sctx.imageSmoothingEnabled = true;
+    sctx.drawImage(source, 0, 0, smallW, smallH);
+
+    // Redraw pixelated onto the SAME canvas the texture already wraps —
+    // animations bind directly to Frame objects at anims.create() time, so
+    // swapping in a brand new texture/canvas under the same key would
+    // orphan those references instead of updating what they point to.
+    const ctx = source.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(small, 0, 0, w, h);
+
+    texture.refresh();
   }
 
   private g(): Phaser.GameObjects.Graphics {
