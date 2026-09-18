@@ -12,13 +12,33 @@ import type { EconomySystem } from "../systems/EconomySystem";
 import type { EquipmentSystem } from "../systems/EquipmentSystem";
 import type { QuestSystem } from "../systems/QuestSystem";
 import type { SkillId } from "../data/skills";
+import { SHOPS } from "../data/shops";
 import { loadSave, writeSave } from "../systems/SaveSystem";
 
-const WORLD_WIDTH = 1920;
+const WORLD_WIDTH = 2100;
 const WORLD_HEIGHT = 1440;
 const INTERACT_KEY = Phaser.Input.Keyboard.KeyCodes.E;
 
-type Interactable = ResourceNode | TrainingDummy | CraftingStation | Npc;
+// A shop's interior lives far outside the walkable overworld; it's only
+// ever reached by teleport, and the physics/camera bounds are swapped to
+// just this rectangle while the player is inside, so there's no risk of
+// bleed-through or of walking there normally.
+const INTERIOR_X = 6000;
+const INTERIOR_Y = 6000;
+const ROOM_WIDTH = 260;
+const ROOM_HEIGHT = 180;
+
+interface BuildingDoor {
+  kind: "door";
+  x: number;
+  y: number;
+  shopId: string;
+  label: string;
+  returnX: number;
+  returnY: number;
+}
+
+type Interactable = ResourceNode | TrainingDummy | CraftingStation | Npc | BuildingDoor;
 
 export class GameScene extends Phaser.Scene {
   private skills!: SkillSystem;
@@ -32,6 +52,11 @@ export class GameScene extends Phaser.Scene {
   private dummy!: TrainingDummy;
   private stations: CraftingStation[] = [];
   private npcs: Npc[] = [];
+  private doors: BuildingDoor[] = [];
+  private buildingColliders: Phaser.GameObjects.Image[] = [];
+  private interiorSprite!: Phaser.GameObjects.Image;
+  private insideShopId: string | null = null;
+  private outsideReturn = new Phaser.Math.Vector2();
   private keyE!: Phaser.Input.Keyboard.Key;
   private autosaveAccum = 0;
 
@@ -48,6 +73,12 @@ export class GameScene extends Phaser.Scene {
     this.quests = this.game.registry.get("quests");
 
     const save = loadSave();
+    // A save captured while inside a shop stores the far-away interior
+    // stage coordinates; spawning there on a fresh load would strand the
+    // player, so fall back to the default outside spawn instead.
+    const wasIndoors = save && save.playerX >= WORLD_WIDTH;
+    const spawnX = wasIndoors || !save ? WORLD_WIDTH / 2 : save.playerX;
+    const spawnY = wasIndoors || !save ? WORLD_HEIGHT / 2 : save.playerY;
 
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.add
@@ -56,17 +87,20 @@ export class GameScene extends Phaser.Scene {
 
     this.buildWorld();
 
-    this.player = new Player(
-      this,
-      save?.playerX ?? WORLD_WIDTH / 2,
-      save?.playerY ?? WORLD_HEIGHT / 2,
-    );
+    this.player = new Player(this, spawnX, spawnY);
+
+    this.interiorSprite = this.add
+      .image(INTERIOR_X, INTERIOR_Y, "interior-generalStore")
+      .setVisible(false);
 
     for (const node of this.nodes) {
       if (node.isSolid()) this.physics.add.collider(this.player, node);
     }
     for (const npc of this.npcs) {
       if (npc.body) this.physics.add.collider(this.player, npc);
+    }
+    for (const building of this.buildingColliders) {
+      this.physics.add.collider(this.player, building);
     }
 
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
@@ -169,38 +203,111 @@ export class GameScene extends Phaser.Scene {
   private buildVillage(): void {
     // Plaza with four shops clustered around it, in open space away from
     // the wilds; the harbor sits by the existing fishing spots.
-    this.add.image(1750, 360, "dirt-plaza").setDepth(0.05);
+    this.add.image(1750, 380, "dirt-plaza").setDepth(0.05);
 
-    const buildings: [number, number, string][] = [
-      [1650, 260, "building-generalStore"],
-      [1850, 260, "building-blacksmith"],
-      [1650, 430, "building-carpenter"],
-      [1850, 430, "building-magicShop"],
+    interface ShopBuildingDef {
+      x: number;
+      y: number;
+      height: number;
+      textureKey: string;
+      shopId: string;
+      npcId: string;
+      npcName: string;
+      questId?: string;
+      collision: { width: number; height: number };
+    }
+    const shopBuildings: ShopBuildingDef[] = [
+      {
+        x: 1620,
+        y: 260,
+        height: 100,
+        textureKey: "building-generalStore",
+        shopId: "generalStore",
+        npcId: "generalStore",
+        npcName: "Mira",
+        collision: { width: 90, height: 50 },
+      },
+      {
+        x: 1900,
+        y: 260,
+        height: 108,
+        textureKey: "building-blacksmith",
+        shopId: "blacksmith",
+        npcId: "blacksmith",
+        npcName: "Doran",
+        questId: "blacksmithOre",
+        collision: { width: 92, height: 56 },
+      },
+      {
+        x: 1620,
+        y: 520,
+        height: 100,
+        textureKey: "building-carpenter",
+        shopId: "carpenter",
+        npcId: "carpenter",
+        npcName: "Wren",
+        questId: "carpenterLogs",
+        collision: { width: 90, height: 50 },
+      },
+      {
+        x: 1900,
+        y: 520,
+        height: 140,
+        textureKey: "building-magicShop",
+        shopId: "magicShop",
+        npcId: "magicShop",
+        npcName: "Ilyara",
+        collision: { width: 66, height: 80 },
+      },
     ];
-    for (const [x, y, key] of buildings) {
-      this.add.image(x, y, key).setDepth(0.4);
+
+    for (const b of shopBuildings) {
+      const sprite = this.add.image(b.x, b.y, b.textureKey).setDepth(0.4);
+      this.physics.add.existing(sprite, true);
+      (sprite.body as Phaser.Physics.Arcade.StaticBody).setSize(b.collision.width, b.collision.height);
+      this.buildingColliders.push(sprite);
+
+      const doorY = b.y + b.height / 2 - 8;
+      this.doors.push({
+        kind: "door",
+        x: b.x,
+        y: doorY,
+        shopId: b.shopId,
+        label: SHOPS[b.shopId]?.name ?? b.shopId,
+        returnX: b.x,
+        returnY: doorY + 26,
+      });
+
+      // Stood beside the door rather than directly in front of it, so
+      // walking straight toward the door to go inside doesn't pass through
+      // (and get outprioritized by) the shopkeeper's own interact radius.
+      this.npcs.push(
+        new Npc(this, b.x + 48, doorY + 18, {
+          id: b.npcId,
+          name: b.npcName,
+          textureKey: `npc-${b.npcId}`,
+          shopId: b.shopId,
+          questId: b.questId,
+        }),
+      );
     }
 
     this.add.image(1590, 1030, "dock").setOrigin(0, 0.5).setDepth(0.15);
     this.add.image(1610, 1015, "boat").setDepth(0.16);
     this.add.image(1660, 1040, "boat").setScale(0.85).setDepth(0.16);
 
-    const npcDefs: [number, number, string, string, string | undefined, string | undefined][] = [
-      [1650, 300, "generalStore", "Mira", "generalStore", undefined],
-      [1850, 300, "blacksmith", "Doran", "blacksmith", "blacksmithOre"],
-      [1650, 470, "carpenter", "Wren", "carpenter", "carpenterLogs"],
-      [1850, 470, "magicShop", "Ilyara", "magicShop", undefined],
-      [1560, 990, "harborMaster", "Captain Voss", undefined, "harborFish"],
-    ];
-    for (const [x, y, textureId, name, shopId, questId] of npcDefs) {
-      this.npcs.push(
-        new Npc(this, x, y, { id: textureId, name, textureKey: `npc-${textureId}`, shopId, questId }),
-      );
-    }
+    this.npcs.push(
+      new Npc(this, 1560, 990, {
+        id: "harborMaster",
+        name: "Captain Voss",
+        textureKey: "npc-harborMaster",
+        questId: "harborFish",
+      }),
+    );
 
     const villagerSpots: [number, number, string][] = [
-      [1740, 380, "villager1"],
-      [1790, 420, "villager2"],
+      [1740, 400, "villager1"],
+      [1790, 440, "villager2"],
     ];
     for (const [x, y, textureId] of villagerSpots) {
       this.npcs.push(
@@ -283,6 +390,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateInteraction(): void {
+    const pressedE =
+      Phaser.Input.Keyboard.JustDown(this.keyE) || this.touchInput.consumeInteract();
+
+    if (this.insideShopId) {
+      this.events.emit("interactTarget", "Press E to exit");
+      if (pressedE) this.exitBuilding();
+      return;
+    }
+
     const px = this.player.x;
     const py = this.player.y;
 
@@ -315,13 +431,20 @@ export class GameScene extends Phaser.Scene {
         closestDist = d;
       }
     }
+    for (const door of this.doors) {
+      const d = Phaser.Math.Distance.Between(door.x, door.y, px, py);
+      if (d <= 40 && d < closestDist) {
+        closest = door;
+        closestDist = d;
+      }
+    }
 
     this.events.emit("interactTarget", this.describeTarget(closest));
 
-    const pressedE =
-      Phaser.Input.Keyboard.JustDown(this.keyE) || this.touchInput.consumeInteract();
     if (pressedE && closest && !this.player.isLocked()) {
-      if (closest instanceof ResourceNode) {
+      if ("kind" in closest && closest.kind === "door") {
+        this.enterBuilding(closest);
+      } else if (closest instanceof ResourceNode) {
         if (closest.tryStartAction()) {
           this.player.faceToward(closest.x, closest.y);
           this.player.lockForAction(closest.config.actionDurationMs, "gather");
@@ -351,6 +474,9 @@ export class GameScene extends Phaser.Scene {
 
   private describeTarget(target: Interactable | null): string | null {
     if (!target) return null;
+    if ("kind" in target && target.kind === "door") {
+      return `Press E to enter ${target.label}`;
+    }
     if (target instanceof ResourceNode) {
       if (target.isDepleted()) return `${target.config.label} (depleted)`;
       return `Press E to gather ${target.config.label}`;
@@ -372,6 +498,38 @@ export class GameScene extends Phaser.Scene {
       return target.config.name;
     }
     return null;
+  }
+
+  private enterBuilding(door: BuildingDoor): void {
+    this.insideShopId = door.shopId;
+    this.outsideReturn.set(door.returnX, door.returnY);
+
+    this.interiorSprite.setTexture(`interior-${door.shopId}`).setVisible(true);
+
+    // Body.reset() clamps immediately against the world's CURRENT bounds
+    // (via checkWorldBounds()), so the bounds must already be the room's
+    // before we reposition the player — otherwise reset() clamps against
+    // the bounds we're about to replace.
+    const bx = INTERIOR_X - ROOM_WIDTH / 2;
+    const by = INTERIOR_Y - ROOM_HEIGHT / 2;
+    this.physics.world.setBounds(bx, by, ROOM_WIDTH, ROOM_HEIGHT);
+    this.cameras.main.setBounds(bx, by, ROOM_WIDTH, ROOM_HEIGHT);
+
+    const spawnX = INTERIOR_X;
+    const spawnY = INTERIOR_Y + ROOM_HEIGHT / 2 - 40;
+    this.player.setPosition(spawnX, spawnY);
+    (this.player.body as Phaser.Physics.Arcade.Body).reset(spawnX, spawnY);
+  }
+
+  private exitBuilding(): void {
+    this.insideShopId = null;
+    this.interiorSprite.setVisible(false);
+
+    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+    this.player.setPosition(this.outsideReturn.x, this.outsideReturn.y);
+    (this.player.body as Phaser.Physics.Arcade.Body).reset(this.outsideReturn.x, this.outsideReturn.y);
   }
 
   private saveNow(): void {

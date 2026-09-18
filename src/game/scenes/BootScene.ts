@@ -21,6 +21,7 @@ export class BootScene extends Phaser.Scene {
     this.makeVegetationTextures();
     this.makeCritterTextures();
     this.makeVillageTextures();
+    this.makeInteriorTextures();
     this.makeNpcTextures();
 
     this.pixelateAllTextures();
@@ -435,38 +436,249 @@ export class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  /** A small house shape with a distinct roof color and an icon on its sign, for each shop type. */
-  private makeBuildingTexture(
+  /** Ground shadow + door, shared by every building so each one still reads as "a building". */
+  private drawBuildingBase(g: Phaser.GameObjects.Graphics, w: number, h: number, doorColor: number): void {
+    g.fillStyle(0x000000, 0.22).fillEllipse(w / 2, h - 2, w * 0.85, 10);
+    g.fillStyle(doorColor, 1).fillRect(w / 2 - 9, h - 26, 18, 26);
+    g.lineStyle(1, 0x000000, 0.4).strokeRect(w / 2 - 9, h - 26, 18, 26);
+  }
+
+  private makeGeneralStoreTexture(): void {
+    const g = this.g();
+    const w = 110;
+    const h = 100;
+    this.drawBuildingBase(g, w, h, 0x5a3a20);
+
+    g.fillStyle(0xd9c08a, 1).fillRect(6, 34, w - 12, h - 40);
+    g.lineStyle(1, 0xb8965a, 0.6);
+    for (let x = 6; x < w - 6; x += 12) g.lineBetween(x, 34, x, h - 6);
+
+    // Wide shingled roof with a bit of overhang.
+    g.fillStyle(0x8a5a3a, 1).fillRect(-4, 18, w + 8, 18);
+    g.fillStyle(0x6b4423, 1).fillTriangle(-4, 18, w + 4, 18, w / 2, -6);
+    g.lineStyle(1, 0x4a2f18, 0.5);
+    for (let x = 4; x < w; x += 10) g.lineBetween(x, 18, x - 2, 36);
+
+    // Striped awning over the door.
+    g.fillStyle(0xb8433a, 1);
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle(i % 2 === 0 ? 0xb8433a : 0xe8e0d0, 1);
+      g.fillTriangle(w / 2 - 20 + i * 8, 36, w / 2 - 12 + i * 8, 36, w / 2 - 16 + i * 8, 46);
+    }
+    g.fillStyle(0x3a2a1a, 1).fillRect(w / 2 - 22, 34, 44, 4);
+
+    // Windows either side of the door.
+    g.fillStyle(0xcfe3f2, 0.9).fillRect(16, 48, 16, 14).fillRect(w - 32, 48, 16, 14);
+    g.lineStyle(1, 0x3a2a1a, 0.6).strokeRect(16, 48, 16, 14).strokeRect(w - 32, 48, 16, 14);
+
+    // Barrels and a crate out front.
+    g.fillStyle(0x8a6a3a, 1).fillRoundedRect(8, h - 24, 14, 20, 3);
+    g.fillStyle(0x6b4423, 1).fillRect(8, h - 18, 14, 2).fillRect(8, h - 10, 14, 2);
+    g.fillStyle(0xa5763a, 1).fillRect(w - 22, h - 18, 16, 16);
+    g.lineStyle(1, 0x6b4423, 1).strokeRect(w - 22, h - 18, 16, 16);
+
+    g.fillStyle(0xffffff, 1).fillRoundedRect(w / 2 - 16, 2, 32, 14, 3);
+    g.lineStyle(1, 0x2b2320, 0.6).strokeRoundedRect(w / 2 - 16, 2, 32, 14, 3);
+    g.fillStyle(0x8a5a3a, 1).fillRect(w / 2 - 10, 6, 20, 8);
+
+    g.generateTexture("building-generalStore", w, h);
+    g.destroy();
+  }
+
+  private makeBlacksmithTexture(): void {
+    const g = this.g();
+    const w = 112;
+    const h = 108;
+    this.drawBuildingBase(g, w, h, 0x2b2320);
+
+    g.fillStyle(0x7d7d87, 1).fillRect(6, 40, w - 12, h - 46);
+    g.fillStyle(0x6a6a74, 0.6);
+    for (let y = 44; y < h - 6; y += 8) {
+      for (let x = 8 + ((y / 8) % 2 === 0 ? 0 : 5); x < w - 8; x += 10) {
+        g.fillRect(x, y, 8, 6);
+      }
+    }
+
+    // Heavy flat-ish roof.
+    g.fillStyle(0x4a2f2f, 1).fillRect(-2, 26, w + 4, 16);
+    g.fillStyle(0x5a3a3a, 1).fillTriangle(-2, 26, w + 2, 26, w / 2, 6);
+
+    // Chimney with smoke.
+    g.fillStyle(0x5a5a62, 1).fillRect(w - 30, -6, 14, 34);
+    g.fillStyle(0x9a9aa4, 0.7).fillCircle(w - 23, -10, 6).fillCircle(w - 18, -18, 5).fillCircle(w - 26, -20, 4);
+
+    // Glowing forge window.
+    g.fillStyle(0xff8c3a, 0.9).fillRect(18, 56, 20, 16);
+    g.fillStyle(0xffd28a, 0.8).fillRect(22, 60, 12, 8);
+    g.lineStyle(1, 0x2b2320, 0.7).strokeRect(18, 56, 20, 16);
+
+    g.fillStyle(0xcfe3f2, 0.85).fillRect(w - 40, 56, 16, 14);
+    g.lineStyle(1, 0x2b2320, 0.6).strokeRect(w - 40, 56, 16, 14);
+
+    // An anvil sitting out front.
+    g.fillStyle(0x3a3a3a, 1).fillRect(w / 2 + 16, h - 20, 14, 6).fillRect(w / 2 + 20, h - 14, 6, 8);
+
+    g.fillStyle(0xd9c8a0, 1).fillRoundedRect(w / 2 - 16, 2, 32, 14, 3);
+    g.lineStyle(1, 0x2b2320, 0.6).strokeRoundedRect(w / 2 - 16, 2, 32, 14, 3);
+    g.fillStyle(0x3a3a3a, 1).fillRect(w / 2 - 9, 6, 8, 4).fillRect(w / 2 - 12, 5, 3, 7);
+
+    g.generateTexture("building-blacksmith", w, h);
+    g.destroy();
+  }
+
+  private makeCarpenterTexture(): void {
+    const g = this.g();
+    const w = 110;
+    const h = 100;
+    this.drawBuildingBase(g, w, h, 0x4a2f18);
+
+    g.fillStyle(0xc9a973, 1).fillRect(6, 36, w - 12, h - 42);
+    g.lineStyle(1, 0xa5824f, 0.6);
+    for (let y = 40; y < h - 6; y += 8) g.lineBetween(6, y, w - 6, y);
+
+    // Single-slope lean-to roof.
+    g.fillStyle(0x6b8a4a, 1).fillTriangle(-4, 44, w + 4, 24, w + 4, 44);
+    g.fillRect(-4, 34, w + 8, 12);
+    g.lineStyle(1, 0x4a6a32, 0.5);
+    for (let x = 0; x < w; x += 10) g.lineBetween(x, 24 + (x / w) * 20, x, 44 + (x / w) * 0);
+
+    g.fillStyle(0xcfe3f2, 0.85).fillRect(16, 50, 16, 14);
+    g.lineStyle(1, 0x3a2a1a, 0.6).strokeRect(16, 50, 16, 14);
+
+    // Sawhorse + plank out front.
+    g.fillStyle(0x8a6a3a, 1).fillRect(w - 34, h - 18, 26, 4);
+    g.fillStyle(0x6b4423, 1).fillRect(w - 32, h - 14, 3, 10).fillRect(w - 12, h - 14, 3, 10);
+
+    // Stacked log pile beside the building.
+    g.fillStyle(0x8a6a3a, 1).fillCircle(w - 6, h - 8, 8).fillCircle(w + 8, h - 8, 8).fillCircle(w + 1, h - 18, 8);
+    g.fillStyle(0xd9c08a, 1).fillCircle(w - 6, h - 8, 3).fillCircle(w + 8, h - 8, 3).fillCircle(w + 1, h - 18, 3);
+
+    g.fillStyle(0xe8e0d0, 1).fillRoundedRect(w / 2 - 16, 2, 32, 14, 3);
+    g.lineStyle(1, 0x2b2320, 0.6).strokeRoundedRect(w / 2 - 16, 2, 32, 14, 3);
+    g.fillStyle(0x9d9da7, 1).fillCircle(w / 2, 9, 5);
+    g.fillStyle(0xe8e0d0, 1).fillCircle(w / 2, 9, 2);
+
+    g.generateTexture("building-carpenter", w, h);
+    g.destroy();
+  }
+
+  private makeMagicShopTexture(): void {
+    const g = this.g();
+    const w = 92;
+    const h = 140;
+    this.drawBuildingBase(g, w, h, 0x2a1a3a);
+
+    // Tall narrow tower.
+    g.fillStyle(0x6a4a8a, 1).fillRect(10, 50, w - 20, h - 56);
+    g.fillStyle(0x5a3a78, 0.5);
+    for (let y = 54; y < h - 6; y += 10) g.lineBetween(10, y, w - 10, y);
+
+    // Tall pointed spire roof.
+    g.fillStyle(0x3a2a5a, 1).fillTriangle(2, 52, w - 2, 52, w / 2, -20);
+    g.fillStyle(0x2a1a45, 1).fillTriangle(w / 2 - 6, 4, w / 2 + 6, 4, w / 2, -20);
+
+    // Round glowing window.
+    g.fillStyle(0xffe066, 0.85).fillCircle(w / 2, 78, 12);
+    g.fillStyle(0xfff3c0, 0.7).fillCircle(w / 2, 78, 6);
+    g.lineStyle(1, 0x2a1a3a, 0.8).strokeCircle(w / 2, 78, 12);
+
+    // Floating stars beside the spire.
+    const star = (cx: number, cy: number, r: number) => {
+      g.fillStyle(0xffe066, 1);
+      for (let i = 0; i < 5; i++) {
+        const a = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+        const a2 = (Math.PI * 2 * (i + 0.5)) / 5 - Math.PI / 2;
+        g.fillTriangle(cx, cy, cx + Math.cos(a) * r, cy + Math.sin(a) * r, cx + Math.cos(a2) * (r / 2), cy + Math.sin(a2) * (r / 2));
+      }
+    };
+    star(w - 4, 14, 7);
+    star(10, 30, 5);
+
+    g.fillStyle(0xe8dcf5, 1).fillRoundedRect(w / 2 - 14, 2, 28, 14, 3);
+    g.lineStyle(1, 0x2a1a3a, 0.6).strokeRoundedRect(w / 2 - 14, 2, 28, 14, 3);
+    star(w / 2, 9, 5);
+
+    g.generateTexture("building-magicShop", w, h);
+    g.destroy();
+  }
+
+  /** A themed backdrop for a shop's interior — the whole walkable room painted as one image. */
+  private makeInteriorTexture(
     key: string,
+    floorColor: number,
     wallColor: number,
-    roofColor: number,
-    drawIcon: (g: Phaser.GameObjects.Graphics) => void,
+    drawFurniture: (g: Phaser.GameObjects.Graphics, w: number, h: number) => void,
   ): void {
     const g = this.g();
-    const w = 64;
-    const h = 56;
-    g.fillStyle(0x000000, 0.2).fillEllipse(w / 2, h - 3, w * 0.8, 8);
-    g.fillStyle(wallColor, 1).fillRoundedRect(4, 22, w - 8, h - 26, 3);
-    g.fillStyle(roofColor, 1).fillTriangle(0, 24, w, 24, w / 2, 0);
-    g.fillStyle(0x2b2320, 1).fillRect(w / 2 - 8, h - 20, 16, 20);
-    g.fillStyle(0xcfe3f2, 0.85).fillRect(10, 30, 12, 10).fillRect(w - 22, 30, 12, 10);
-    g.fillStyle(0xffffff, 1).fillRoundedRect(w / 2 - 12, 2, 24, 14, 3);
-    g.lineStyle(1, 0x2b2320, 0.6).strokeRoundedRect(w / 2 - 12, 2, 24, 14, 3);
-    g.save();
-    g.translateCanvas(w / 2, 9);
-    drawIcon(g);
-    g.restore();
+    const w = 260;
+    const h = 180;
+    g.fillStyle(wallColor, 1).fillRect(0, 0, w, 70);
+    g.fillStyle(floorColor, 1).fillRect(0, 70, w, h - 70);
+    g.lineStyle(1, 0x000000, 0.12);
+    for (let x = 0; x < w; x += 20) g.lineBetween(x, 70, x, h);
+    for (let y = 76; y < h; y += 14) g.lineBetween(0, y, w, y);
+    g.lineStyle(2, 0x000000, 0.2).lineBetween(0, 70, w, 70);
+
+    drawFurniture(g, w, h);
+
+    // A doormat marking the exit at the bottom-center.
+    g.fillStyle(0x8a3a3a, 0.8).fillRoundedRect(w / 2 - 20, h - 16, 40, 10, 2);
+
     g.generateTexture(key, w, h);
     g.destroy();
   }
 
+  private makeInteriorTextures(): void {
+    this.makeInteriorTexture("interior-generalStore", 0xc9a973, 0xe8dcc0, (g, w, h) => {
+      g.fillStyle(0x6b4423, 1).fillRect(10, 16, w - 20, 8).fillRect(10, 32, w - 20, 8).fillRect(10, 48, w - 20, 8);
+      const goods = [0xe85c7a, 0x6699cc, 0xf0c23a, 0x8ab4e8, 0xe08a3a];
+      for (let i = 0; i < 5; i++) g.fillStyle(goods[i], 1).fillRect(16 + i * 44, 8, 10, 8);
+      for (let i = 0; i < 5; i++) g.fillStyle(goods[(i + 2) % 5], 1).fillRect(16 + i * 44, 24, 10, 8);
+      g.fillStyle(0x8a6a3a, 1).fillRect(w / 2 - 40, h - 60, 80, 24);
+      g.lineStyle(1, 0x5a3a20, 0.6).strokeRect(w / 2 - 40, h - 60, 80, 24);
+    });
+
+    this.makeInteriorTexture("interior-blacksmith", 0x7d7d87, 0x5a4a4a, (g, w, h) => {
+      g.fillStyle(0xff8c3a, 0.9).fillRect(w / 2 - 20, 14, 40, 30);
+      g.fillStyle(0xffd28a, 0.8).fillRect(w / 2 - 12, 20, 24, 18);
+      g.fillStyle(0x3a3a3a, 1).fillRect(w / 2 - 26, 44, 52, 10);
+      g.fillStyle(0x9d9da7, 1).fillRect(20, h - 50, 6, 40).fillRect(30, h - 50, 6, 34).fillRect(40, h - 50, 6, 44);
+      g.fillStyle(0xd8d8e4, 1).fillTriangle(20, h - 50, 26, h - 50, 23, h - 60);
+      g.fillTriangle(30, h - 50, 36, h - 50, 33, h - 66);
+      g.fillStyle(0x3a3a3a, 1).fillRect(w - 60, h - 20, 20, 8).fillRect(w - 54, h - 14, 8, 10);
+    });
+
+    this.makeInteriorTexture("interior-carpenter", 0xd9c08a, 0xc9a973, (g, w, h) => {
+      g.fillStyle(0x8a6a3a, 1).fillRect(w / 2 - 44, h - 62, 88, 26);
+      g.lineStyle(1, 0x5a3a20, 0.6).strokeRect(w / 2 - 44, h - 62, 88, 26);
+      g.fillStyle(0x6b4423, 1).fillRect(20, 10, 8, 40).fillRect(34, 10, 8, 40).fillRect(48, 10, 8, 40);
+      g.fillStyle(0x9d9da7, 1).fillCircle(w - 40, 30, 16);
+      g.fillStyle(0xc9a973, 1).fillCircle(w - 40, 30, 5);
+      for (let i = 0; i < 8; i++) {
+        const a = (Math.PI * 2 * i) / 8;
+        g.fillStyle(0x7a7a84, 1).fillRect(w - 40 + Math.cos(a) * 16 - 1, 30 + Math.sin(a) * 16 - 3, 2, 6);
+      }
+    });
+
+    this.makeInteriorTexture("interior-magicShop", 0x4a3a6a, 0x2a1a45, (g, w, h) => {
+      g.fillStyle(0x3a2a5a, 1).fillRect(10, 10, w - 20, 34);
+      const potions = [0xff8c3a, 0x8ab4e8, 0xe85c7a, 0x6bd98a, 0xffe066];
+      for (let i = 0; i < 5; i++) {
+        g.fillStyle(potions[i], 0.9).fillRoundedRect(18 + i * 44, 16, 10, 14, 3);
+      }
+      g.fillStyle(0x2a1a3a, 1).fillRect(w / 2 - 20, h - 54, 40, 22);
+      g.fillStyle(0x8ab4e8, 0.7).fillCircle(w / 2, h - 60, 10);
+      g.fillStyle(0xffffff, 0.5).fillCircle(w / 2 - 3, h - 63, 3);
+    });
+  }
+
   private makeVillageTextures(): void {
-    const plazaW = 340;
-    const plazaH = 300;
+    const plazaW = 460;
+    const plazaH = 400;
     const plaza = this.g();
     plaza.fillStyle(0xc9a973, 1).fillEllipse(plazaW / 2, plazaH / 2, plazaW, plazaH);
     plaza.fillStyle(0xb8925c, 0.5);
-    for (let i = 0; i < 26; i++) {
+    for (let i = 0; i < 40; i++) {
       plaza.fillCircle(
         Phaser.Math.Between(10, plazaW - 10),
         Phaser.Math.Between(10, plazaH - 10),
@@ -476,27 +688,10 @@ export class BootScene extends Phaser.Scene {
     plaza.generateTexture("dirt-plaza", plazaW, plazaH);
     plaza.destroy();
 
-    this.makeBuildingTexture("building-generalStore", 0xd9c08a, 0x8a5a3a, (g) => {
-      g.fillStyle(0x8a5a3a, 1).fillRect(-6, -5, 12, 10);
-      g.lineStyle(1, 0x5a3a20, 1).strokeRect(-6, -5, 12, 10).lineBetween(-6, 0, 6, 0);
-    });
-    this.makeBuildingTexture("building-blacksmith", 0x9a9a9a, 0x5a3a3a, (g) => {
-      g.fillStyle(0x3a3a3a, 1).fillRect(-6, -1, 9, 4);
-      g.fillRect(-8, -5, 4, 10);
-    });
-    this.makeBuildingTexture("building-carpenter", 0xc9a973, 0x6b8a4a, (g) => {
-      g.fillStyle(0x6b4423, 1).fillRect(-7, -1, 14, 2);
-      g.fillStyle(0x9d9da7, 1).fillCircle(0, 0, 5);
-      g.fillStyle(0xc9a973, 1).fillCircle(0, 0, 2);
-    });
-    this.makeBuildingTexture("building-magicShop", 0x6a4a8a, 0x3a2a5a, (g) => {
-      g.fillStyle(0xffe066, 1);
-      for (let i = 0; i < 5; i++) {
-        const a = (Math.PI * 2 * i) / 5 - Math.PI / 2;
-        const a2 = (Math.PI * 2 * (i + 0.5)) / 5 - Math.PI / 2;
-        g.fillTriangle(0, 0, Math.cos(a) * 6, Math.sin(a) * 6, Math.cos(a2) * 3, Math.sin(a2) * 3);
-      }
-    });
+    this.makeGeneralStoreTexture();
+    this.makeBlacksmithTexture();
+    this.makeCarpenterTexture();
+    this.makeMagicShopTexture();
 
     let g = this.g();
     g.fillStyle(0x8a6a4a, 1).fillRect(0, 0, 90, 40);

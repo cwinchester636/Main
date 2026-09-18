@@ -44,7 +44,8 @@ export class Critter extends Phaser.GameObjects.Sprite {
         onComplete: () => this.scheduleNextMove(Phaser.Math.Between(300, 1500)),
       });
     } else {
-      this.play("rabbit-hop");
+      // Rabbit poses are single static frames, not registered animations.
+      this.setTexture("rabbit-hop");
       this.scene.tweens.add({
         targets: this,
         x: tx,
@@ -52,7 +53,7 @@ export class Critter extends Phaser.GameObjects.Sprite {
         duration: 220,
         ease: "Quad.Out",
         onComplete: () => {
-          this.play("rabbit-idle");
+          this.setTexture("rabbit-idle");
           this.scheduleNextMove(Phaser.Math.Between(1500, 4500));
         },
       });
