@@ -370,7 +370,7 @@ export class UIScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const hasTouch = this.sys.game.device.input.touch;
 
-    this.joystickCenter.set(110, height - 150);
+    this.joystickCenter.set(170, height - 150);
 
     const joystickBase = this.add
       .circle(this.joystickCenter.x, this.joystickCenter.y, JOYSTICK_RADIUS, 0xffffff, 0.12)
