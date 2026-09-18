@@ -49,6 +49,10 @@ export class GameScene extends Phaser.Scene {
       save?.playerY ?? WORLD_HEIGHT / 2,
     );
 
+    for (const node of this.nodes) {
+      if (node.isSolid()) this.physics.add.collider(this.player, node);
+    }
+
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     this.cameras.main.setZoom(1.4);
@@ -71,6 +75,7 @@ export class GameScene extends Phaser.Scene {
       actionDurationMs: 900,
       respawnDelayMs: 8000,
       interactionRadius: 46,
+      collisionSize: { width: 26, height: 16 },
     };
     const treeConfig: Omit<ResourceNodeConfig, "label"> = {
       textureKey: "tree",
@@ -83,6 +88,7 @@ export class GameScene extends Phaser.Scene {
       actionDurationMs: 900,
       respawnDelayMs: 8000,
       interactionRadius: 50,
+      collisionSize: { width: 20, height: 20 },
     };
     const fishConfig: Omit<ResourceNodeConfig, "label"> = {
       textureKey: "fishingspot",

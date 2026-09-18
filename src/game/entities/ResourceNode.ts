@@ -14,6 +14,8 @@ export interface ResourceNodeConfig {
   respawnDelayMs: number;
   interactionRadius: number;
   label: string;
+  /** Physical footprint that blocks the player while the node isn't depleted. Omit for a walk-through node. */
+  collisionSize?: { width: number; height: number };
 }
 
 /** A gatherable world object (tree, ore vein, fishing spot, ...). */
@@ -46,6 +48,25 @@ export class ResourceNode extends Phaser.GameObjects.Container {
     this.add([this.progressBarBg, this.progressBarFill]);
 
     scene.physics.add.existing(this, true);
+    const body = this.body as Phaser.Physics.Arcade.StaticBody;
+    if (config.collisionSize) {
+      const { width, height } = config.collisionSize;
+      // StaticBody.setSize() normally re-centers itself on the game object
+      // via gameObject.getCenter(), but Container has no getCenter(), so
+      // that step silently no-ops and leaves the body positioned from its
+      // stale default (64x64) size. Position it ourselves first, then size
+      // it with centering disabled so it isn't clobbered.
+      body.position.x = x - width / 2;
+      body.position.y = y - height / 2;
+      body.setSize(width, height, false);
+    } else {
+      body.enable = false;
+    }
+  }
+
+  /** Whether this node has a solid footprint at all (independent of depleted state). */
+  isSolid(): boolean {
+    return !!this.config.collisionSize;
   }
 
   isDepleted(): boolean {
@@ -116,12 +137,18 @@ export class ResourceNode extends Phaser.GameObjects.Container {
     this.depleted = true;
     this.respawnRemainingMs = this.config.respawnDelayMs;
     this.sprite.setTexture(this.config.depletedTextureKey);
+    if (this.config.collisionSize) {
+      (this.body as Phaser.Physics.Arcade.StaticBody).enable = false;
+    }
   }
 
   private respawn(): void {
     this.depleted = false;
     this.charges = this.config.maxCharges;
     this.sprite.setTexture(this.config.textureKey);
+    if (this.config.collisionSize) {
+      (this.body as Phaser.Physics.Arcade.StaticBody).enable = true;
+    }
     this.scene.tweens.add({
       targets: this.sprite,
       scale: { from: 0.5, to: 1 },
