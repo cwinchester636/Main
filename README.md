@@ -25,6 +25,19 @@ If a live API is unreachable (offline, corporate firewall, rate limit), the pick
 
 **Not yet verified end-to-end against the live APIs.** This was built and unit-tested (`src/data/providers/*Provider.js` export pure `normalize*Card` functions tested against hand-built sample payloads matching each API's documented schema) in a sandboxed environment whose network policy blocks these exact domains, so the request/response wiring has only been exercised via its error-fallback path, not a real successful fetch. It should work as-is (these are the standard, CORS-enabled, no-key APIs used across the hobbyist TCG-app ecosystem for exactly this purpose) — worth a smoke test after your first deploy or local run with normal internet access.
 
+### Card pricing
+
+Cards show an estimated USD value (💰 total on Home, a `$` badge on each card chip and search result) for **One Piece Card Game** and **Union Arena** — the two games that were asked about specifically.
+
+These are **mock values, not live TCGplayer data.** Getting real prices from TCGplayer requires:
+
+1. A [TCGplayer Developer](https://developer.tcgplayer.com/) account and API credentials (`client_id`/`client_secret`) — an approval process, not instant, and not something obtainable from within this session.
+2. A backend to hold that secret and call the API server-side. TCGplayer's API isn't CORS-open for direct browser calls the way the card-search APIs above are, and SwapDeck is currently a fully static app with no server.
+
+Scraping tcgplayer.com's pages directly (instead of using the API) isn't done here because it violates TCGplayer's Terms of Service (they explicitly prohibit automated data harvesting) and wouldn't work from a browser anyway (no CORS support).
+
+`src/data/pricing/mockTcgplayerPricing.js` is shaped exactly like the real Pricing API response (`marketPrice`/`lowPrice`/`midPrice`/`highPrice` in USD) and every price badge in the UI reads through `getCardPrice(cardId)`, so wiring in the real API later — via a backend proxy — means replacing that one function's implementation, not touching any component. It's also worth noting Union Arena is a newer Bandai game; whether it's even listed as a TCGplayer category hasn't been confirmed.
+
 ### Note on "nearby collectors" and matching
 
 This is a front-end prototype: `src/data/mockCollectors.js` stands in for a real backend (accounts, geolocation, messaging). Because cards can come from the curated catalog *or* a live API, each with its own id scheme, `src/utils/matching.js` identifies "the same card" by game + card name rather than by id (see `matchKey()`) — a deliberate simplification, since a real production app would match on a canonical id instead.
@@ -46,6 +59,7 @@ npm run lint      # oxlint
 - `src/data/mockCollectors.js` — mock nearby collectors with Have/Want lists, standing in for a real backend.
 - `src/utils/matching.js` — computes mutual vs. one-directional trade matches via `matchKey()` (game + name).
 - `src/utils/rarity.js` — maps each live API's rarity vocabulary onto the app's 5-bucket scale.
+- `src/data/pricing/mockTcgplayerPricing.js` — mock One Piece / Union Arena card values, shaped like the real TCGplayer Pricing API for an easy future swap.
 - `src/hooks/useLocalStorage.js` — persists your profile, Haves, Wants, and sent proposals on-device.
 - `src/components/` — `Onboarding`, `BottomNav`, `HomeView`, `CollectionView`, `CardPicker`, `CardChip`, `MatchesView`, `ProfileView`.
 - `src/App.jsx` — app shell and tab navigation.

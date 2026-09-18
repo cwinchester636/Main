@@ -222,6 +222,16 @@
   color: var(--ink-soft);
 }
 
+.value-note {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin: -8px 0 18px;
+}
+
+.value-note strong {
+  color: var(--success);
+}
+
 .callout {
   background: var(--primary-soft);
   border-radius: var(--radius-md);
@@ -375,6 +385,14 @@
   text-overflow: ellipsis;
 }
 
+.card-chip-price {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--success);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .card-chip-remove {
   border: none;
   background: none;
@@ -490,10 +508,19 @@
   white-space: nowrap;
 }
 
+.picker-row-price {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--success);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .picker-row-add {
   font-size: 1.2rem;
   color: var(--primary);
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .picker-row-image {
