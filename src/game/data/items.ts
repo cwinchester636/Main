@@ -6,7 +6,22 @@ export type ItemId =
   | "rawFish"
   | "cookedFish"
   | "pickaxeUpgrade"
-  | "axeUpgrade";
+  | "axeUpgrade"
+  | "sword"
+  | "leatherArmor"
+  | "luckyCharm";
+
+export type EquipSlot = "weapon" | "armor" | "accessory" | "tool";
+
+export interface EquipStats {
+  slot: EquipSlot;
+  /** Flat bonus to combat damage dealt. */
+  attackBonus?: number;
+  /** Flat bonus to (currently cosmetic) defense. */
+  defenseBonus?: number;
+  /** Percent bonus to XP earned: tool applies to gathering, accessory to everything. */
+  xpBonusPct?: number;
+}
 
 export interface ItemDefinition {
   id: ItemId;
@@ -14,6 +29,7 @@ export interface ItemDefinition {
   description: string;
   color: number;
   stackable: boolean;
+  equip?: EquipStats;
 }
 
 export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
@@ -65,6 +81,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     description: "A crafted upgrade that speeds up mining.",
     color: 0x999999,
     stackable: false,
+    equip: { slot: "tool", xpBonusPct: 5 },
   },
   axeUpgrade: {
     id: "axeUpgrade",
@@ -72,5 +89,30 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     description: "A crafted upgrade that speeds up woodcutting.",
     color: 0x777777,
     stackable: false,
+    equip: { slot: "tool", xpBonusPct: 5 },
+  },
+  sword: {
+    id: "sword",
+    name: "Sword",
+    description: "A well-balanced blade from the blacksmith.",
+    color: 0xd8d8e4,
+    stackable: false,
+    equip: { slot: "weapon", attackBonus: 4 },
+  },
+  leatherArmor: {
+    id: "leatherArmor",
+    name: "Leather Armor",
+    description: "Sturdy tanned hide, stitched by the blacksmith.",
+    color: 0x8a6a4a,
+    stackable: false,
+    equip: { slot: "armor", defenseBonus: 3 },
+  },
+  luckyCharm: {
+    id: "luckyCharm",
+    name: "Lucky Charm",
+    description: "A magic trinket that speeds up learning.",
+    color: 0xc86ce8,
+    stackable: false,
+    equip: { slot: "accessory", xpBonusPct: 10 },
   },
 };

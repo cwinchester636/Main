@@ -1,7 +1,6 @@
 import Phaser from "phaser";
 
 const MAX_HP = 30;
-const DAMAGE_PER_HIT = 6;
 const XP_PER_HIT = 4;
 const ATTACK_COOLDOWN_MS = 500;
 const RESPAWN_DELAY_MS = 4000;
@@ -44,11 +43,11 @@ export class TrainingDummy extends Phaser.GameObjects.Container {
     return !this.defeated && this.cooldownRemaining <= 0;
   }
 
-  /** Land one hit; returns XP earned, or null if the attack couldn't land. */
-  attack(): number | null {
+  /** Land one hit for `damage`; returns XP earned, or null if the attack couldn't land. */
+  attack(damage: number): number | null {
     if (!this.canAttack()) return null;
     this.cooldownRemaining = ATTACK_COOLDOWN_MS;
-    this.hp = Math.max(0, this.hp - DAMAGE_PER_HIT);
+    this.hp = Math.max(0, this.hp - damage);
     this.hpBarFill.width = 32 * (this.hp / MAX_HP);
 
     this.sprite.setTint(0xff9999);

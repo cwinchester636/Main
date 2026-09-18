@@ -6,6 +6,9 @@ import { UIScene } from "./game/scenes/UIScene";
 import { SkillSystem } from "./game/systems/SkillSystem";
 import { InventorySystem } from "./game/systems/InventorySystem";
 import { TouchInput } from "./game/systems/TouchInput";
+import { EconomySystem } from "./game/systems/EconomySystem";
+import { EquipmentSystem } from "./game/systems/EquipmentSystem";
+import { QuestSystem } from "./game/systems/QuestSystem";
 import { loadSave } from "./game/systems/SaveSystem";
 
 const save = loadSave();
@@ -38,3 +41,9 @@ const game = new Phaser.Game(config);
 game.registry.set("skills", new SkillSystem(save?.skills));
 game.registry.set("inventory", new InventorySystem(save?.inventory));
 game.registry.set("touchInput", new TouchInput());
+game.registry.set("economy", new EconomySystem(save?.gold ?? 0));
+game.registry.set("equipment", new EquipmentSystem(save?.equipment));
+game.registry.set("quests", new QuestSystem(save?.completedQuests));
+
+// Handy for debugging from the browser console.
+(window as unknown as { game: Phaser.Game }).game = game;

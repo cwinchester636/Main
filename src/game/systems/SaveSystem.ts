@@ -1,4 +1,4 @@
-import type { ItemId } from "../data/items";
+import type { EquipSlot, ItemId } from "../data/items";
 import type { SkillId } from "../data/skills";
 import type { SkillState } from "./SkillSystem";
 
@@ -9,6 +9,9 @@ export interface SaveData {
   inventory: Partial<Record<ItemId, number>>;
   playerX: number;
   playerY: number;
+  gold?: number;
+  equipment?: Partial<Record<EquipSlot, ItemId>>;
+  completedQuests?: string[];
 }
 
 export function loadSave(): SaveData | null {

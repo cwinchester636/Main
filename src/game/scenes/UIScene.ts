@@ -5,11 +5,24 @@ import {
   SKILL_DEFINITIONS,
   type SkillId,
 } from "../data/skills";
-import { ITEM_DEFINITIONS, type ItemId } from "../data/items";
+import { ITEM_DEFINITIONS, type EquipSlot, type ItemId } from "../data/items";
 import { RECIPES } from "../data/recipes";
+import { SHOPS } from "../data/shops";
+import { QUESTS } from "../data/quests";
 import type { SkillGainEvent, SkillLevelUpEvent, SkillSystem } from "../systems/SkillSystem";
 import type { InventorySystem } from "../systems/InventorySystem";
 import type { TouchInput } from "../systems/TouchInput";
+import type { EconomySystem } from "../systems/EconomySystem";
+import type { EquipmentSystem } from "../systems/EquipmentSystem";
+import type { QuestSystem } from "../systems/QuestSystem";
+
+const EQUIP_SLOTS: EquipSlot[] = ["weapon", "armor", "accessory", "tool"];
+const SLOT_LABELS: Record<EquipSlot, string> = {
+  weapon: "Weapon",
+  armor: "Armor",
+  accessory: "Accessory",
+  tool: "Tool",
+};
 
 const PANEL_WIDTH = 210;
 const JOYSTICK_RADIUS = 46;
@@ -19,6 +32,17 @@ export class UIScene extends Phaser.Scene {
   private skills!: SkillSystem;
   private inventory!: InventorySystem;
   private touchInput!: TouchInput;
+  private economy!: EconomySystem;
+  private equipment!: EquipmentSystem;
+  private quests!: QuestSystem;
+
+  private goldText!: Phaser.GameObjects.Text;
+  private shopPanel!: Phaser.GameObjects.Container;
+  private openShopId: string | null = null;
+  private questPanel!: Phaser.GameObjects.Container;
+  private openQuestId: string | null = null;
+  private inventoryPanel!: Phaser.GameObjects.Container;
+  private inventoryPanelOpen = false;
 
   private skillRows = new Map<
     SkillId,
@@ -51,16 +75,34 @@ export class UIScene extends Phaser.Scene {
     this.skills = this.game.registry.get("skills");
     this.inventory = this.game.registry.get("inventory");
     this.touchInput = this.game.registry.get("touchInput");
+    this.economy = this.game.registry.get("economy");
+    this.equipment = this.game.registry.get("equipment");
+    this.quests = this.game.registry.get("quests");
 
     this.buildSkillsPanel();
     this.buildPrompt();
     this.buildInventoryBar();
+    this.buildGoldDisplay();
     this.buildCraftingPanel();
+    this.buildShopPanel();
+    this.buildQuestPanel();
+    this.buildInventoryPanel();
     this.buildTouchControls();
 
     this.skills.on("xpGained", (e: SkillGainEvent) => this.refreshSkillRow(e.skillId));
     this.skills.on("levelUp", (e: SkillLevelUpEvent) => this.queueToast(e));
-    this.inventory.on("change", () => this.refreshInventoryBar());
+    this.inventory.on("change", () => {
+      this.refreshInventoryBar();
+      if (this.shopPanel.visible && this.openShopId) this.renderShopPanel(this.openShopId);
+      if (this.inventoryPanelOpen) this.renderInventoryPanel();
+    });
+    this.economy.on("change", (gold: number) => {
+      this.goldText.setText(`Gold: ${gold}`);
+      if (this.shopPanel.visible && this.openShopId) this.renderShopPanel(this.openShopId);
+    });
+    this.equipment.on("change", () => {
+      if (this.inventoryPanelOpen) this.renderInventoryPanel();
+    });
 
     const game = this.scene.get("Game");
     game.events.on("interactTarget", (text: string | null) => {
@@ -71,6 +113,10 @@ export class UIScene extends Phaser.Scene {
       "openCrafting",
       (skillsFor: SkillId[], label: string) => this.toggleCraftingPanel(skillsFor, label),
     );
+    game.events.on("openShop", (shopId: string) => this.toggleShopPanel(shopId));
+    game.events.on("openQuest", (questId: string) => this.toggleQuestPanel(questId));
+
+    this.input.keyboard!.on("keydown-I", () => this.toggleInventoryPanel());
 
     for (const id of ALL_SKILL_IDS) this.refreshSkillRow(id);
     this.refreshInventoryBar();
@@ -255,6 +301,20 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
+  // ---------- Gold ----------
+
+  private buildGoldDisplay(): void {
+    this.goldText = this.add
+      .text(12, 30, `Gold: ${this.economy.getGold()}`, {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#ffe066",
+        backgroundColor: "#00000066",
+        padding: { x: 6, y: 3 },
+      })
+      .setScrollFactor(0);
+  }
+
   // ---------- Crafting panel ----------
 
   private buildCraftingPanel(): void {
@@ -361,6 +421,387 @@ export class UIScene extends Phaser.Scene {
       }
 
       this.craftingPanel.add([nameLine, inputLine, craftBtn]);
+    });
+  }
+
+  // ---------- Shop panel ----------
+
+  private buildShopPanel(): void {
+    this.shopPanel = this.add.container(0, 0).setVisible(false);
+  }
+
+  private toggleShopPanel(shopId: string): void {
+    if (this.shopPanel.visible && this.openShopId === shopId) {
+      this.shopPanel.setVisible(false);
+      this.openShopId = null;
+      return;
+    }
+    this.openShopId = shopId;
+    this.renderShopPanel(shopId);
+    this.shopPanel.setVisible(true);
+  }
+
+  private renderShopPanel(shopId: string): void {
+    this.shopPanel.removeAll(true);
+    const shop = SHOPS[shopId];
+    if (!shop) return;
+    const { width, height } = this.scale;
+
+    const rows = shop.sells.length + shop.buys.length;
+    const panelW = 340;
+    const panelH = 90 + rows * 26 + (shop.buys.length ? 20 : 0);
+    const x = width / 2 - panelW / 2;
+    const y = height / 2 - panelH / 2;
+
+    const bg = this.add
+      .rectangle(x, y, panelW, panelH, 0x0b0b12, 0.94)
+      .setOrigin(0, 0)
+      .setStrokeStyle(1, 0xffffff, 0.25)
+      .setScrollFactor(0);
+    const title = this.add
+      .text(x + 12, y + 10, shop.name, { fontFamily: "monospace", fontSize: "16px", color: "#ffe066" })
+      .setScrollFactor(0);
+    const goldLine = this.add
+      .text(x + panelW - 90, y + 12, `Gold: ${this.economy.getGold()}`, {
+        fontFamily: "monospace",
+        fontSize: "11px",
+        color: "#ffe066",
+      })
+      .setScrollFactor(0);
+    const closeBtn = this.add
+      .text(x + panelW - 26, y + 8, "[X]", { fontFamily: "monospace", fontSize: "14px", color: "#ff8080" })
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => {
+        this.shopPanel.setVisible(false);
+        this.openShopId = null;
+      });
+    this.shopPanel.add([bg, title, goldLine, closeBtn]);
+
+    let rowY = y + 40;
+    if (shop.sells.length) {
+      this.shopPanel.add(
+        this.add
+          .text(x + 12, rowY, "For Sale", { fontFamily: "monospace", fontSize: "11px", color: "#888888" })
+          .setScrollFactor(0),
+      );
+      rowY += 20;
+      for (const listing of shop.sells) {
+        const def = ITEM_DEFINITIONS[listing.item];
+        const canAfford = this.economy.canAfford(listing.price);
+        const line = this.add
+          .text(x + 12, rowY, `${def.name} — ${listing.price}g`, {
+            fontFamily: "monospace",
+            fontSize: "12px",
+            color: canAfford ? "#e8e8f0" : "#888888",
+          })
+          .setScrollFactor(0);
+        const btn = this.add
+          .text(x + panelW - 70, rowY, "[Buy]", {
+            fontFamily: "monospace",
+            fontSize: "12px",
+            color: canAfford ? "#66ff99" : "#555555",
+          })
+          .setScrollFactor(0);
+        if (canAfford) {
+          btn.setInteractive({ useHandCursor: true }).on("pointerdown", () => {
+            if (!this.economy.spend(listing.price)) return;
+            this.inventory.add(listing.item, 1);
+            this.renderShopPanel(shopId);
+          });
+        }
+        this.shopPanel.add([line, btn]);
+        rowY += 26;
+      }
+    }
+
+    if (shop.buys.length) {
+      rowY += 6;
+      this.shopPanel.add(
+        this.add
+          .text(x + 12, rowY, "Sell Items", { fontFamily: "monospace", fontSize: "11px", color: "#888888" })
+          .setScrollFactor(0),
+      );
+      rowY += 20;
+      for (const listing of shop.buys) {
+        const def = ITEM_DEFINITIONS[listing.item];
+        const owned = this.inventory.getQuantity(listing.item);
+        const line = this.add
+          .text(x + 12, rowY, `${def.name} — ${listing.price}g  (have ${owned})`, {
+            fontFamily: "monospace",
+            fontSize: "12px",
+            color: owned > 0 ? "#e8e8f0" : "#888888",
+          })
+          .setScrollFactor(0);
+        const btn = this.add
+          .text(x + panelW - 70, rowY, "[Sell]", {
+            fontFamily: "monospace",
+            fontSize: "12px",
+            color: owned > 0 ? "#66ff99" : "#555555",
+          })
+          .setScrollFactor(0);
+        if (owned > 0) {
+          btn.setInteractive({ useHandCursor: true }).on("pointerdown", () => {
+            if (!this.inventory.remove(listing.item, 1)) return;
+            this.economy.add(listing.price);
+            this.renderShopPanel(shopId);
+          });
+        }
+        this.shopPanel.add([line, btn]);
+        rowY += 26;
+      }
+    }
+  }
+
+  // ---------- Quest panel ----------
+
+  private buildQuestPanel(): void {
+    this.questPanel = this.add.container(0, 0).setVisible(false);
+  }
+
+  private toggleQuestPanel(questId: string): void {
+    if (this.questPanel.visible && this.openQuestId === questId) {
+      this.questPanel.setVisible(false);
+      this.openQuestId = null;
+      return;
+    }
+    this.openQuestId = questId;
+    this.renderQuestPanel(questId);
+    this.questPanel.setVisible(true);
+  }
+
+  private renderQuestPanel(questId: string): void {
+    this.questPanel.removeAll(true);
+    const quest = QUESTS.find((q) => q.id === questId);
+    if (!quest) return;
+    const { width, height } = this.scale;
+
+    const panelW = 340;
+    const panelH = 170;
+    const x = width / 2 - panelW / 2;
+    const y = height / 2 - panelH / 2;
+
+    const bg = this.add
+      .rectangle(x, y, panelW, panelH, 0x0b0b12, 0.94)
+      .setOrigin(0, 0)
+      .setStrokeStyle(1, 0xffffff, 0.25)
+      .setScrollFactor(0);
+    const title = this.add
+      .text(x + 12, y + 10, quest.title, { fontFamily: "monospace", fontSize: "16px", color: "#ffe066" })
+      .setScrollFactor(0);
+    const closeBtn = this.add
+      .text(x + panelW - 26, y + 8, "[X]", { fontFamily: "monospace", fontSize: "14px", color: "#ff8080" })
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => {
+        this.questPanel.setVisible(false);
+        this.openQuestId = null;
+      });
+    const desc = this.add
+      .text(x + 12, y + 36, quest.description, {
+        fontFamily: "monospace",
+        fontSize: "11px",
+        color: "#cccccc",
+        wordWrap: { width: panelW - 24 },
+      })
+      .setScrollFactor(0);
+
+    this.questPanel.add([bg, title, closeBtn, desc]);
+
+    const state = this.quests.getState(questId);
+    if (state === "completed") {
+      this.questPanel.add(
+        this.add
+          .text(x + 12, y + 120, "Completed — thank you!", {
+            fontFamily: "monospace",
+            fontSize: "12px",
+            color: "#66ff99",
+          })
+          .setScrollFactor(0),
+      );
+      return;
+    }
+
+    const owned = this.inventory.getQuantity(quest.requirement.item);
+    const itemName = ITEM_DEFINITIONS[quest.requirement.item].name;
+    const ready = owned >= quest.requirement.quantity;
+    this.questPanel.add(
+      this.add
+        .text(
+          x + 12,
+          y + 100,
+          `Need: ${itemName} x${quest.requirement.quantity} (have ${owned})`,
+          { fontFamily: "monospace", fontSize: "12px", color: ready ? "#66ff99" : "#e08080" },
+        )
+        .setScrollFactor(0),
+    );
+    this.questPanel.add(
+      this.add
+        .text(x + 12, y + 118, `Reward: ${quest.reward.gold}g + ${quest.reward.xp} ${quest.reward.skill} XP`, {
+          fontFamily: "monospace",
+          fontSize: "11px",
+          color: "#ffe066",
+        })
+        .setScrollFactor(0),
+    );
+
+    const turnInBtn = this.add
+      .text(x + 12, y + panelH - 30, ready ? "[Turn In]" : "[Not ready]", {
+        fontFamily: "monospace",
+        fontSize: "13px",
+        color: ready ? "#66ff99" : "#555555",
+      })
+      .setScrollFactor(0);
+    if (ready) {
+      turnInBtn.setInteractive({ useHandCursor: true }).on("pointerdown", () => {
+        this.quests.turnIn(questId, this.inventory, this.economy, this.skills);
+        this.renderQuestPanel(questId);
+      });
+    }
+    this.questPanel.add(turnInBtn);
+  }
+
+  // ---------- Inventory & equipment panel ----------
+
+  private buildInventoryPanel(): void {
+    this.inventoryPanel = this.add.container(0, 0).setVisible(false);
+  }
+
+  private toggleInventoryPanel(): void {
+    this.inventoryPanelOpen = !this.inventoryPanelOpen;
+    if (this.inventoryPanelOpen) this.renderInventoryPanel();
+    this.inventoryPanel.setVisible(this.inventoryPanelOpen);
+  }
+
+  private renderInventoryPanel(): void {
+    this.inventoryPanel.removeAll(true);
+    const { width, height } = this.scale;
+
+    const equippableEntries = Object.entries(this.inventory.getAll()).filter(
+      ([id, qty]) => (qty ?? 0) > 0 && !!ITEM_DEFINITIONS[id as ItemId].equip,
+    );
+    const otherEntries = Object.entries(this.inventory.getAll()).filter(
+      ([id, qty]) => (qty ?? 0) > 0 && !ITEM_DEFINITIONS[id as ItemId].equip,
+    );
+
+    const panelW = 360;
+    const panelH =
+      140 + equippableEntries.length * 20 + Math.ceil(otherEntries.length / 2) * 18 + 30;
+    const x = width / 2 - panelW / 2;
+    const y = height / 2 - panelH / 2;
+
+    const bg = this.add
+      .rectangle(x, y, panelW, panelH, 0x0b0b12, 0.95)
+      .setOrigin(0, 0)
+      .setStrokeStyle(1, 0xffffff, 0.25)
+      .setScrollFactor(0);
+    const title = this.add
+      .text(x + 12, y + 10, "Inventory & Equipment", {
+        fontFamily: "monospace",
+        fontSize: "15px",
+        color: "#ffe066",
+      })
+      .setScrollFactor(0);
+    const closeBtn = this.add
+      .text(x + panelW - 26, y + 8, "[X]", { fontFamily: "monospace", fontSize: "14px", color: "#ff8080" })
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true })
+      .on("pointerdown", () => this.toggleInventoryPanel());
+    this.inventoryPanel.add([bg, title, closeBtn]);
+
+    const stats = this.equipment.getStats();
+    const statsLine = this.add
+      .text(
+        x + 12,
+        y + 34,
+        `ATK ${stats.attack}   DEF ${stats.defense}   Gather Bonus +${stats.gatherXpBonusPct}%   XP Bonus +${stats.allXpBonusPct}%   Gold ${this.economy.getGold()}`,
+        { fontFamily: "monospace", fontSize: "10px", color: "#8fd9ff" },
+      )
+      .setScrollFactor(0);
+    this.inventoryPanel.add(statsLine);
+
+    let rowY = y + 56;
+    for (const slot of EQUIP_SLOTS) {
+      const equippedId = this.equipment.getEquipped(slot);
+      const label = equippedId ? ITEM_DEFINITIONS[equippedId].name : "(empty)";
+      const line = this.add
+        .text(x + 12, rowY, `${SLOT_LABELS[slot]}: ${label}`, {
+          fontFamily: "monospace",
+          fontSize: "12px",
+          color: equippedId ? "#e8e8f0" : "#888888",
+        })
+        .setScrollFactor(0);
+      this.inventoryPanel.add(line);
+      if (equippedId) {
+        const btn = this.add
+          .text(x + panelW - 80, rowY, "[Unequip]", {
+            fontFamily: "monospace",
+            fontSize: "11px",
+            color: "#ff8080",
+          })
+          .setScrollFactor(0)
+          .setInteractive({ useHandCursor: true })
+          .on("pointerdown", () => {
+            this.equipment.unequip(slot, this.inventory);
+            this.renderInventoryPanel();
+          });
+        this.inventoryPanel.add(btn);
+      }
+      rowY += 18;
+    }
+
+    rowY += 8;
+    this.inventoryPanel.add(
+      this.add
+        .text(x + 12, rowY, "Gear", { fontFamily: "monospace", fontSize: "11px", color: "#888888" })
+        .setScrollFactor(0),
+    );
+    rowY += 18;
+    for (const [id, qty] of equippableEntries) {
+      const itemId = id as ItemId;
+      const def = ITEM_DEFINITIONS[itemId];
+      const line = this.add
+        .text(x + 12, rowY, `${def.name} x${qty}`, {
+          fontFamily: "monospace",
+          fontSize: "12px",
+          color: "#e8e8f0",
+        })
+        .setScrollFactor(0);
+      const btn = this.add
+        .text(x + panelW - 70, rowY, "[Equip]", {
+          fontFamily: "monospace",
+          fontSize: "11px",
+          color: "#66ff99",
+        })
+        .setScrollFactor(0)
+        .setInteractive({ useHandCursor: true })
+        .on("pointerdown", () => {
+          this.equipment.equip(itemId, this.inventory);
+          this.renderInventoryPanel();
+        });
+      this.inventoryPanel.add([line, btn]);
+      rowY += 20;
+    }
+
+    rowY += 8;
+    this.inventoryPanel.add(
+      this.add
+        .text(x + 12, rowY, "Materials", { fontFamily: "monospace", fontSize: "11px", color: "#888888" })
+        .setScrollFactor(0),
+    );
+    rowY += 18;
+    otherEntries.forEach(([id, qty], i) => {
+      const def = ITEM_DEFINITIONS[id as ItemId];
+      const col = i % 2;
+      const line = this.add
+        .text(x + 12 + col * 170, rowY, `${def.name} x${qty}`, {
+          fontFamily: "monospace",
+          fontSize: "11px",
+          color: "#cccccc",
+        })
+        .setScrollFactor(0);
+      this.inventoryPanel.add(line);
+      if (col === 1) rowY += 18;
     });
   }
 

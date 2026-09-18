@@ -11,6 +11,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private facing: Facing = "down";
   private shadow: Phaser.GameObjects.Image;
   private idleBob = 0;
+  private actionLockMs = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, "player-down-0");
@@ -21,7 +22,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.shadow = scene.add.image(x, y + 17, "player-shadow").setDepth(0.5);
 
     this.setCollideWorldBounds(true);
-    this.setSize(18, 10).setOffset(7, 29);
+    this.setSize(18, 10).setOffset(11, 29);
 
     const keyboard = scene.input.keyboard!;
     this.cursors = keyboard.createCursorKeys();
@@ -60,10 +61,46 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
+   * Turns to face a world point without moving; used before an action
+   * animation. Ignores near-zero deltas (e.g. standing flush against a
+   * solid resource node) so a tiny rounding difference can't flip the
+   * facing away from the direction the player actually walked in from.
+   */
+  faceToward(x: number, y: number): void {
+    const dx = x - this.x;
+    const dy = y - this.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      this.facing = dx > 0 ? "right" : "left";
+    } else {
+      this.facing = dy > 0 ? "down" : "up";
+    }
+  }
+
+  /** Roots the player in place and plays a gather/attack swing for `durationMs`. */
+  lockForAction(durationMs: number, kind: "gather" | "attack"): void {
+    this.actionLockMs = durationMs;
+    this.setVelocity(0, 0);
+    this.play(`${kind}-${this.facing}`, true);
+  }
+
+  isLocked(): boolean {
+    return this.actionLockMs > 0;
+  }
+
+  /**
    * @param touchVector Analog direction from an on-screen joystick, magnitude
    *   0..1. When it has any length it overrides keyboard input for this frame.
    */
   update(delta: number, touchVector?: Phaser.Math.Vector2): void {
+    if (this.actionLockMs > 0) {
+      this.actionLockMs -= delta;
+      this.setVelocity(0, 0);
+      this.shadow.setPosition(this.x, this.y + 17);
+      if (this.actionLockMs <= 0) this.play(`idle-${this.facing}`, true);
+      return;
+    }
+
     let dirX: number;
     let dirY: number;
     let velocity: Phaser.Math.Vector2;
