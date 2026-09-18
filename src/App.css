@@ -344,6 +344,14 @@
   font-size: 1.1rem;
 }
 
+.card-chip-image {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
 .card-chip-text {
   display: flex;
   flex-direction: column;
@@ -450,7 +458,7 @@
 .picker-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   border: none;
   background: var(--bg);
   border-radius: var(--radius-sm);
@@ -459,22 +467,51 @@
   text-align: left;
 }
 
+.picker-row-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .picker-row-name {
   display: block;
   font-size: 0.9rem;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .picker-row-set {
   display: block;
   font-size: 0.75rem;
   color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .picker-row-add {
   font-size: 1.2rem;
   color: var(--primary);
   font-weight: 700;
+}
+
+.picker-row-image {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+.picker-status {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin: -4px 0 10px;
+}
+
+.picker-status.warn {
+  color: var(--danger);
 }
 
 /* Matches */

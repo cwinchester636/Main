@@ -12,8 +12,8 @@ import './App.css'
 
 export default function App() {
   const [profile, setProfile] = useLocalStorage('swapdeck.profile', null)
-  const [haves, setHaves] = useLocalStorage('swapdeck.haves', [])
-  const [wants, setWants] = useLocalStorage('swapdeck.wants', [])
+  const [haves, setHaves] = useLocalStorage('swapdeck.haves.v2', [])
+  const [wants, setWants] = useLocalStorage('swapdeck.wants.v2', [])
   const [proposedIds, setProposedIds] = useLocalStorage('swapdeck.proposed', [])
   const [tab, setTab] = useState('home')
 

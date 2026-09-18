@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react'
-import { GAMES, searchCards } from '../data/cards.js'
+import { GAMES } from '../data/cards.js'
+import { useCardSearch } from '../hooks/useCardSearch.js'
 
 export default function CardPicker({ title, excludeIds, onAdd, onClose }) {
   const [query, setQuery] = useState('')
   const [gameFilter, setGameFilter] = useState('all')
+  const { results, liveStatus } = useCardSearch(query, gameFilter)
 
   const excludeSet = useMemo(() => new Set(excludeIds), [excludeIds])
-  const results = useMemo(
-    () => searchCards(query, gameFilter).filter((card) => !excludeSet.has(card.id)),
-    [query, gameFilter, excludeSet],
-  )
+  const visibleResults = results.filter((card) => !excludeSet.has(card.id))
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -48,18 +47,28 @@ export default function CardPicker({ title, excludeIds, onAdd, onClose }) {
           ))}
         </div>
 
+        {liveStatus === 'loading' && (
+          <p className="picker-status">Searching the full card database…</p>
+        )}
+        {liveStatus === 'error' && (
+          <p className="picker-status warn">Live search is unavailable right now — showing our featured catalog instead.</p>
+        )}
+
         <div className="picker-results">
-          {results.length === 0 && (
+          {visibleResults.length === 0 && (
             <p className="empty-hint">No cards match "{query}". Try another search.</p>
           )}
-          {results.map((card) => (
+          {visibleResults.map((card) => (
             <button
               key={card.id}
               type="button"
               className="picker-row"
-              onClick={() => onAdd(card.id)}
+              onClick={() => onAdd(card)}
             >
-              <span>
+              {card.image ? (
+                <img className="picker-row-image" src={card.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+              ) : null}
+              <span className="picker-row-text">
                 <span className="picker-row-name">{card.name}</span>
                 <span className="picker-row-set">{card.set} · {card.number}</span>
               </span>
