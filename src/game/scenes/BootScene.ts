@@ -37,7 +37,7 @@ export class BootScene extends Phaser.Scene {
    * off — the classic "mosaic filter" trick — so every sprite ends up as
    * chunky, consistently-sized blocks instead of smooth curves.
    */
-  private pixelateAllTextures(pixelSize = 3): void {
+  private pixelateAllTextures(pixelSize = 2): void {
     for (const key of this.textures.getTextureKeys()) {
       if (key.startsWith("__")) continue;
       this.pixelateTexture(key, pixelSize);
