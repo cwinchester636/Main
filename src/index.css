@@ -6,15 +6,20 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: #14151d;
-  color: #f3f4f6;
-  font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+  background: #f4f1ea;
+  color: #221d1a;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
 }
 
 #root {
   min-height: 100svh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+}
+
+button,
+input {
+  font-family: inherit;
 }

@@ -1,20 +1,19 @@
-# Spire Jumper
+# SwapDeck
 
-A browser-based platformer built with React and HTML5 Canvas. Run, jump, stomp enemies, dodge spikes, collect coins, and reach the flag across three hand-built levels.
+A mobile-first web app that helps trading card collectors (Pokémon, Magic: The Gathering, sports cards) find **mutual, in-person trades** with people nearby — instead of shipping costs, grading disputes, and marketplace scams.
 
-## Controls
+You build two lists — **Haves** and **Wants** — and SwapDeck surfaces nearby collectors whose lists complement yours, prioritizing "perfect" matches where *they have what you want* **and** *you have what they want*.
 
-- **Move** — Arrow keys or A/D
-- **Jump** — Arrow Up, W, or Space (hold for a higher jump)
-- Touch controls appear automatically on touchscreens.
+## How it works
 
-## Gameplay
+- **Onboarding** — pick a display name and avatar (stored only on your device).
+- **My Collection** — search a catalog of well-known Pokémon, MTG, and sports cards and add them to your Have/Want lists.
+- **Matches** — a ranked list of nearby collectors. 🤝 "Perfect trade match" badges mean a trade needs no cash or shipping either way. Tap a match to see exactly which cards would change hands, then send a trade proposal.
+- **Profile** — update your name/avatar or reset your collection.
 
-- 3 lives per run, shared across all levels.
-- Stomp on enemies from above to defeat them (+50 score); touching them any other way costs a life.
-- Spikes and falling into pits cost a life and respawn you at the level's start.
-- Collect coins for +10 score each.
-- Reach the flag to complete a level and carry your score/lives into the next one.
+### Note on "nearby collectors"
+
+This is a front-end prototype: `src/data/mockCollectors.js` stands in for a real backend (accounts, geolocation, messaging). The matching logic in `src/utils/matching.js` and every view are written against that data shape, so swapping in a real API later is a drop-in change — nothing else needs to move.
 
 ## Development
 
@@ -27,7 +26,9 @@ npm run lint      # oxlint
 
 ## Project structure
 
-- `src/game/constants.js` — physics and gameplay tuning constants.
-- `src/game/levels.js` — level data, built programmatically from ground gaps, platforms, spikes, coins, and enemy patrol ranges.
-- `src/game/GameCanvas.jsx` — the game engine: input handling, physics/collision, camera, and rendering, driven by `requestAnimationFrame`.
-- `src/App.jsx` — menu, HUD, and overlay screens (level complete, game over, win) wrapped around `GameCanvas`.
+- `src/data/cards.js` — card catalog (name/set/rarity) and search helper.
+- `src/data/mockCollectors.js` — mock nearby collectors with Have/Want lists, standing in for a real backend.
+- `src/utils/matching.js` — computes mutual vs. one-directional trade matches.
+- `src/hooks/useLocalStorage.js` — persists your profile, Haves, Wants, and sent proposals on-device.
+- `src/components/` — `Onboarding`, `BottomNav`, `HomeView`, `CollectionView`, `CardPicker`, `CardChip`, `MatchesView`, `ProfileView`.
+- `src/App.jsx` — app shell and tab navigation.
