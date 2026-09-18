@@ -27,6 +27,11 @@ const INTERIOR_X = 6000;
 const INTERIOR_Y = 6000;
 const ROOM_WIDTH = 260;
 const ROOM_HEIGHT = 180;
+// Matches the side-wall width and back-wall height baked into the interior
+// textures (BootScene.makeInteriorTexture) — the walkable floor is inset
+// from the full room image by these amounts.
+const ROOM_SIDE_WALL = 20;
+const ROOM_BACK_WALL = 70;
 
 interface BuildingDoor {
   kind: "door";
@@ -201,9 +206,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private buildVillage(): void {
-    // Plaza with four shops clustered around it, in open space away from
-    // the wilds; the harbor sits by the existing fishing spots.
-    this.add.image(1750, 380, "dirt-plaza").setDepth(0.05);
+    const fountainX = 1750;
+    const fountainY = 380;
+
+    this.add.image(fountainX, fountainY, "dirt-plaza").setDepth(0.05);
 
     interface ShopBuildingDef {
       x: number;
@@ -216,10 +222,12 @@ export class GameScene extends Phaser.Scene {
       questId?: string;
       collision: { width: number; height: number };
     }
+    // Spread out and staggered — not a mirrored grid — so the village reads
+    // as a real place rather than four identical plots.
     const shopBuildings: ShopBuildingDef[] = [
       {
-        x: 1620,
-        y: 260,
+        x: 1520,
+        y: 210,
         height: 100,
         textureKey: "building-generalStore",
         shopId: "generalStore",
@@ -228,7 +236,7 @@ export class GameScene extends Phaser.Scene {
         collision: { width: 90, height: 50 },
       },
       {
-        x: 1900,
+        x: 1990,
         y: 260,
         height: 108,
         textureKey: "building-blacksmith",
@@ -239,8 +247,8 @@ export class GameScene extends Phaser.Scene {
         collision: { width: 92, height: 56 },
       },
       {
-        x: 1620,
-        y: 520,
+        x: 1550,
+        y: 610,
         height: 100,
         textureKey: "building-carpenter",
         shopId: "carpenter",
@@ -250,8 +258,8 @@ export class GameScene extends Phaser.Scene {
         collision: { width: 90, height: 50 },
       },
       {
-        x: 1900,
-        y: 520,
+        x: 2010,
+        y: 600,
         height: 140,
         textureKey: "building-magicShop",
         shopId: "magicShop",
@@ -261,6 +269,8 @@ export class GameScene extends Phaser.Scene {
       },
     ];
 
+    const doorPositions: { x: number; y: number }[] = [];
+
     for (const b of shopBuildings) {
       const sprite = this.add.image(b.x, b.y, b.textureKey).setDepth(0.4);
       this.physics.add.existing(sprite, true);
@@ -268,6 +278,7 @@ export class GameScene extends Phaser.Scene {
       this.buildingColliders.push(sprite);
 
       const doorY = b.y + b.height / 2 - 8;
+      doorPositions.push({ x: b.x, y: doorY });
       this.doors.push({
         kind: "door",
         x: b.x,
@@ -292,6 +303,40 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
+    // Cobbled roads radiate from the fountain to every doorstep.
+    for (const d of doorPositions) {
+      this.addRoadSegment(fountainX, fountainY, d.x, d.y, 26);
+    }
+
+    const fountain = this.add.image(fountainX, fountainY, "fountain").setDepth(0.5);
+    this.physics.add.existing(fountain, true);
+    (fountain.body as Phaser.Physics.Arcade.StaticBody).setSize(60, 46);
+    this.buildingColliders.push(fountain);
+
+    const lampAndBenchSpots: [number, number, string][] = [
+      [fountainX - 95, fountainY - 75, "lamppost"],
+      [fountainX + 95, fountainY - 75, "lamppost"],
+      [fountainX - 95, fountainY + 95, "lamppost"],
+      [fountainX + 95, fountainY + 95, "lamppost"],
+      [fountainX - 65, fountainY + 105, "bench"],
+      [fountainX + 35, fountainY - 105, "bench"],
+    ];
+    for (const [x, y, key] of lampAndBenchSpots) {
+      this.add.image(x, y, key).setDepth(key === "bench" ? 0.35 : 0.45);
+    }
+
+    const villageGreenery: [number, number, string][] = [
+      [1680, 300, "bush"],
+      [1980, 340, "bush"],
+      [1650, 500, "flower-0"],
+      [1900, 480, "flower-1"],
+      [1770, 250, "flower-2"],
+      [1830, 500, "flower-1"],
+    ];
+    for (const [x, y, key] of villageGreenery) {
+      this.add.image(x, y, key).setDepth(0.2);
+    }
+
     this.add.image(1590, 1030, "dock").setOrigin(0, 0.5).setDepth(0.15);
     this.add.image(1610, 1015, "boat").setDepth(0.16);
     this.add.image(1660, 1040, "boat").setScale(0.85).setDepth(0.16);
@@ -305,9 +350,11 @@ export class GameScene extends Phaser.Scene {
       }),
     );
 
+    // Villagers wander near different corners of the plaza rather than
+    // clustering together at its center.
     const villagerSpots: [number, number, string][] = [
-      [1740, 400, "villager1"],
-      [1790, 440, "villager2"],
+      [1610, 340, "villager1"],
+      [1910, 460, "villager2"],
     ];
     for (const [x, y, textureId] of villagerSpots) {
       this.npcs.push(
@@ -319,6 +366,15 @@ export class GameScene extends Phaser.Scene {
         }),
       );
     }
+  }
+
+  private addRoadSegment(x1: number, y1: number, x2: number, y2: number, width: number): void {
+    const length = Phaser.Math.Distance.Between(x1, y1, x2, y2);
+    const angle = Phaser.Math.Angle.Between(x1, y1, x2, y2);
+    this.add
+      .tileSprite((x1 + x2) / 2, (y1 + y2) / 2, length, width, "road-tile")
+      .setRotation(angle)
+      .setDepth(0.06);
   }
 
   private buildNature(): void {
@@ -510,9 +566,18 @@ export class GameScene extends Phaser.Scene {
     // (via checkWorldBounds()), so the bounds must already be the room's
     // before we reposition the player — otherwise reset() clamps against
     // the bounds we're about to replace.
+    //
+    // The camera gets the full room image so the walls are visible; the
+    // physics (walkable) bounds are inset from that to the actual floor,
+    // so the player can't walk into the painted-on side/back walls.
     const bx = INTERIOR_X - ROOM_WIDTH / 2;
     const by = INTERIOR_Y - ROOM_HEIGHT / 2;
-    this.physics.world.setBounds(bx, by, ROOM_WIDTH, ROOM_HEIGHT);
+    this.physics.world.setBounds(
+      bx + ROOM_SIDE_WALL,
+      by + ROOM_BACK_WALL,
+      ROOM_WIDTH - ROOM_SIDE_WALL * 2,
+      ROOM_HEIGHT - ROOM_BACK_WALL,
+    );
     this.cameras.main.setBounds(bx, by, ROOM_WIDTH, ROOM_HEIGHT);
 
     const spawnX = INTERIOR_X;

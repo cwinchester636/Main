@@ -436,40 +436,74 @@ export class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  /** Ground shadow + door, shared by every building so each one still reads as "a building". */
-  private drawBuildingBase(g: Phaser.GameObjects.Graphics, w: number, h: number, doorColor: number): void {
+  /** Ground shadow + a proper arched, paneled door with a knob — shared so every building reads as "enterable". */
+  private drawBuildingBase(
+    g: Phaser.GameObjects.Graphics,
+    w: number,
+    h: number,
+    doorColor: number,
+    frameColor: number,
+  ): void {
     g.fillStyle(0x000000, 0.22).fillEllipse(w / 2, h - 2, w * 0.85, 10);
-    g.fillStyle(doorColor, 1).fillRect(w / 2 - 9, h - 26, 18, 26);
-    g.lineStyle(1, 0x000000, 0.4).strokeRect(w / 2 - 9, h - 26, 18, 26);
+
+    const doorW = 20;
+    const doorH = 30;
+    const dx = w / 2 - doorW / 2;
+    const dy = h - doorH;
+    const arch = { tl: 7, tr: 7, bl: 0, br: 0 };
+
+    g.fillStyle(frameColor, 1).fillRoundedRect(dx - 3, dy - 4, doorW + 6, doorH + 4, arch);
+    g.fillStyle(doorColor, 1).fillRoundedRect(dx, dy, doorW, doorH, arch);
+    g.lineStyle(1, 0x000000, 0.4).strokeRoundedRect(dx, dy, doorW, doorH, arch);
+
+    // Two raised panels per door leaf.
+    g.lineStyle(1, 0x000000, 0.3);
+    g.strokeRect(dx + 3, dy + 6, doorW - 6, 9);
+    g.strokeRect(dx + 3, dy + 17, doorW - 6, doorH - 21);
+    g.lineBetween(dx + doorW / 2, dy + 2, dx + doorW / 2, dy + doorH - 2);
+
+    g.fillStyle(0xffe066, 1).fillCircle(dx + doorW - 5, dy + doorH / 2 + 3, 1.6);
+
+    // A step below the threshold.
+    g.fillStyle(frameColor, 0.9).fillRect(dx - 5, h - 3, doorW + 10, 3);
   }
 
   private makeGeneralStoreTexture(): void {
     const g = this.g();
     const w = 110;
     const h = 100;
-    this.drawBuildingBase(g, w, h, 0x5a3a20);
+    this.drawBuildingBase(g, w, h, 0x5a3a20, 0x8a5a3a);
 
     g.fillStyle(0xd9c08a, 1).fillRect(6, 34, w - 12, h - 40);
     g.lineStyle(1, 0xb8965a, 0.6);
     for (let x = 6; x < w - 6; x += 12) g.lineBetween(x, 34, x, h - 6);
+    // Corner posts and a base skirting board.
+    g.fillStyle(0x8a5a3a, 1).fillRect(6, 34, 5, h - 40).fillRect(w - 11, 34, 5, h - 40);
+    g.fillStyle(0x6b4423, 1).fillRect(6, h - 8, w - 12, 4);
 
-    // Wide shingled roof with a bit of overhang.
+    // Wide shingled roof with a bit of overhang and a ridge cap.
     g.fillStyle(0x8a5a3a, 1).fillRect(-4, 18, w + 8, 18);
     g.fillStyle(0x6b4423, 1).fillTriangle(-4, 18, w + 4, 18, w / 2, -6);
     g.lineStyle(1, 0x4a2f18, 0.5);
     for (let x = 4; x < w; x += 10) g.lineBetween(x, 18, x - 2, 36);
+    g.fillStyle(0x4a2f18, 1).fillRect(w / 2 - 2, -6, 4, 24);
+    g.fillStyle(0xb8965a, 0.5).fillRect(-4, 18, w + 8, 3);
 
     // Striped awning over the door.
-    g.fillStyle(0xb8433a, 1);
     for (let i = 0; i < 5; i++) {
       g.fillStyle(i % 2 === 0 ? 0xb8433a : 0xe8e0d0, 1);
       g.fillTriangle(w / 2 - 20 + i * 8, 36, w / 2 - 12 + i * 8, 36, w / 2 - 16 + i * 8, 46);
     }
     g.fillStyle(0x3a2a1a, 1).fillRect(w / 2 - 22, 34, 44, 4);
 
-    // Windows either side of the door.
+    // Windows either side of the door, with shutters and a flower box.
+    g.fillStyle(0x8a5a3a, 1).fillRect(13, 46, 22, 18).fillRect(w - 35, 46, 22, 18);
     g.fillStyle(0xcfe3f2, 0.9).fillRect(16, 48, 16, 14).fillRect(w - 32, 48, 16, 14);
     g.lineStyle(1, 0x3a2a1a, 0.6).strokeRect(16, 48, 16, 14).strokeRect(w - 32, 48, 16, 14);
+    g.lineBetween(24, 48, 24, 62).lineBetween(w - 24, 48, w - 24, 62);
+    g.fillStyle(0x6b4423, 1).fillRect(15, 63, 18, 4).fillRect(w - 33, 63, 18, 4);
+    g.fillStyle(0xe85c7a, 1).fillCircle(18, 63, 2).fillCircle(24, 63, 2).fillCircle(30, 63, 2);
+    g.fillStyle(0xf0c23a, 1).fillCircle(w - 30, 63, 2).fillCircle(w - 24, 63, 2).fillCircle(w - 18, 63, 2);
 
     // Barrels and a crate out front.
     g.fillStyle(0x8a6a3a, 1).fillRoundedRect(8, h - 24, 14, 20, 3);
@@ -489,7 +523,7 @@ export class BootScene extends Phaser.Scene {
     const g = this.g();
     const w = 112;
     const h = 108;
-    this.drawBuildingBase(g, w, h, 0x2b2320);
+    this.drawBuildingBase(g, w, h, 0x2b2320, 0x5a3a3a);
 
     g.fillStyle(0x7d7d87, 1).fillRect(6, 40, w - 12, h - 46);
     g.fillStyle(0x6a6a74, 0.6);
@@ -498,24 +532,35 @@ export class BootScene extends Phaser.Scene {
         g.fillRect(x, y, 8, 6);
       }
     }
+    // Dark mortar lines and reinforced corner stones.
+    g.lineStyle(1, 0x3a3a40, 0.4);
+    for (let y = 40; y < h - 6; y += 8) g.lineBetween(6, y, w - 6, y);
+    g.fillStyle(0x5a5a62, 1).fillRect(6, 40, 8, h - 46).fillRect(w - 14, 40, 8, h - 46);
 
-    // Heavy flat-ish roof.
+    // Heavy flat-ish roof with overhanging beams.
     g.fillStyle(0x4a2f2f, 1).fillRect(-2, 26, w + 4, 16);
     g.fillStyle(0x5a3a3a, 1).fillTriangle(-2, 26, w + 2, 26, w / 2, 6);
+    g.fillStyle(0x3a2020, 1).fillRect(-2, 40, 6, 6).fillRect(w - 4, 40, 6, 6);
+    g.fillStyle(0x6a4a4a, 0.5).fillRect(-2, 26, w + 4, 3);
 
     // Chimney with smoke.
     g.fillStyle(0x5a5a62, 1).fillRect(w - 30, -6, 14, 34);
+    g.fillStyle(0x4a4a52, 1).fillRect(w - 32, -8, 18, 5);
     g.fillStyle(0x9a9aa4, 0.7).fillCircle(w - 23, -10, 6).fillCircle(w - 18, -18, 5).fillCircle(w - 26, -20, 4);
 
-    // Glowing forge window.
+    // Glowing forge window with a grille.
     g.fillStyle(0xff8c3a, 0.9).fillRect(18, 56, 20, 16);
     g.fillStyle(0xffd28a, 0.8).fillRect(22, 60, 12, 8);
     g.lineStyle(1, 0x2b2320, 0.7).strokeRect(18, 56, 20, 16);
+    g.lineBetween(24, 56, 24, 72).lineBetween(32, 56, 32, 72).lineBetween(18, 64, 38, 64);
 
     g.fillStyle(0xcfe3f2, 0.85).fillRect(w - 40, 56, 16, 14);
     g.lineStyle(1, 0x2b2320, 0.6).strokeRect(w - 40, 56, 16, 14);
 
-    // An anvil sitting out front.
+    // A weapon rack and an anvil sitting out front.
+    g.fillStyle(0x9d9da7, 1).fillRect(8, h - 30, 3, 22).fillRect(16, h - 34, 3, 26);
+    g.fillStyle(0xd8d8e4, 1).fillTriangle(6, h - 30, 12, h - 30, 9, h - 40);
+    g.fillTriangle(14, h - 34, 20, h - 34, 17, h - 46);
     g.fillStyle(0x3a3a3a, 1).fillRect(w / 2 + 16, h - 20, 14, 6).fillRect(w / 2 + 20, h - 14, 6, 8);
 
     g.fillStyle(0xd9c8a0, 1).fillRoundedRect(w / 2 - 16, 2, 32, 14, 3);
@@ -530,11 +575,15 @@ export class BootScene extends Phaser.Scene {
     const g = this.g();
     const w = 110;
     const h = 100;
-    this.drawBuildingBase(g, w, h, 0x4a2f18);
+    this.drawBuildingBase(g, w, h, 0x4a2f18, 0x6b8a4a);
 
     g.fillStyle(0xc9a973, 1).fillRect(6, 36, w - 12, h - 42);
     g.lineStyle(1, 0xa5824f, 0.6);
     for (let y = 40; y < h - 6; y += 8) g.lineBetween(6, y, w - 6, y);
+    // Cross-brace timber framing, carpenter-style.
+    g.lineStyle(2, 0x6b4423, 0.7);
+    g.lineBetween(6, 40, w / 2 - 2, h - 6).lineBetween(w - 6, 40, w / 2 + 2, h - 6);
+    g.fillStyle(0x6b4423, 1).fillRect(6, 36, 4, h - 42).fillRect(w - 10, 36, 4, h - 42);
 
     // Single-slope lean-to roof.
     g.fillStyle(0x6b8a4a, 1).fillTriangle(-4, 44, w + 4, 24, w + 4, 44);
@@ -566,16 +615,20 @@ export class BootScene extends Phaser.Scene {
     const g = this.g();
     const w = 92;
     const h = 140;
-    this.drawBuildingBase(g, w, h, 0x2a1a3a);
+    this.drawBuildingBase(g, w, h, 0x2a1a3a, 0x5a3a78);
 
-    // Tall narrow tower.
+    // Tall narrow tower with corner buttresses.
     g.fillStyle(0x6a4a8a, 1).fillRect(10, 50, w - 20, h - 56);
     g.fillStyle(0x5a3a78, 0.5);
     for (let y = 54; y < h - 6; y += 10) g.lineBetween(10, y, w - 10, y);
+    g.fillStyle(0x5a3a78, 1).fillRect(8, 50, 6, h - 56).fillRect(w - 14, 50, 6, h - 56);
+    g.fillStyle(0x4a2a68, 0.6).fillRect(10, 50, w - 20, 3);
 
-    // Tall pointed spire roof.
+    // Tall pointed spire roof with banding.
     g.fillStyle(0x3a2a5a, 1).fillTriangle(2, 52, w - 2, 52, w / 2, -20);
     g.fillStyle(0x2a1a45, 1).fillTriangle(w / 2 - 6, 4, w / 2 + 6, 4, w / 2, -20);
+    g.lineStyle(1, 0x1a0f30, 0.6);
+    g.lineBetween(6, 44, w - 6, 44).lineBetween(14, 32, w - 14, 32).lineBetween(22, 20, w - 22, 20);
 
     // Round glowing window.
     g.fillStyle(0xffe066, 0.85).fillCircle(w / 2, 78, 12);
@@ -603,6 +656,13 @@ export class BootScene extends Phaser.Scene {
   }
 
   /** A themed backdrop for a shop's interior — the whole walkable room painted as one image. */
+  private shade(color: number, factor: number): number {
+    const r = Math.min(255, Math.floor(((color >> 16) & 0xff) * factor));
+    const gr = Math.min(255, Math.floor(((color >> 8) & 0xff) * factor));
+    const b = Math.min(255, Math.floor((color & 0xff) * factor));
+    return (r << 16) | (gr << 8) | b;
+  }
+
   private makeInteriorTexture(
     key: string,
     floorColor: number,
@@ -612,12 +672,29 @@ export class BootScene extends Phaser.Scene {
     const g = this.g();
     const w = 260;
     const h = 180;
-    g.fillStyle(wallColor, 1).fillRect(0, 0, w, 70);
-    g.fillStyle(floorColor, 1).fillRect(0, 70, w, h - 70);
+    const sideW = 20;
+    const sideColor = this.shade(wallColor, 0.62);
+    const sideFloor = this.shade(floorColor, 0.75);
+
+    // Side walls run the full height, so the room reads as a box rather
+    // than a flat backdrop; a matching darker floor strip continues them
+    // down to the ground.
+    g.fillStyle(sideColor, 1).fillRect(0, 0, sideW, h).fillRect(w - sideW, 0, sideW, h);
+    g.fillStyle(sideFloor, 1).fillRect(0, 70, sideW, h - 70).fillRect(w - sideW, 70, sideW, h - 70);
+    g.lineStyle(1, 0x000000, 0.3);
+    for (let y = 8; y < h; y += 16) {
+      g.lineBetween(4, y, 4, y + 8).lineBetween(w - 4, y, w - 4, y + 8);
+    }
+
+    g.fillStyle(wallColor, 1).fillRect(sideW, 0, w - sideW * 2, 70);
+    g.fillStyle(floorColor, 1).fillRect(sideW, 70, w - sideW * 2, h - 70);
     g.lineStyle(1, 0x000000, 0.12);
-    for (let x = 0; x < w; x += 20) g.lineBetween(x, 70, x, h);
-    for (let y = 76; y < h; y += 14) g.lineBetween(0, y, w, y);
+    for (let x = sideW; x < w - sideW; x += 20) g.lineBetween(x, 70, x, h);
+    for (let y = 76; y < h; y += 14) g.lineBetween(sideW, y, w - sideW, y);
     g.lineStyle(2, 0x000000, 0.2).lineBetween(0, 70, w, 70);
+    // Seam where the side walls meet the back wall/floor.
+    g.lineStyle(1, 0x000000, 0.35);
+    g.lineBetween(sideW, 0, sideW, h).lineBetween(w - sideW, 0, w - sideW, h);
 
     drawFurniture(g, w, h);
 
@@ -673,12 +750,14 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makeVillageTextures(): void {
-    const plazaW = 460;
-    const plazaH = 400;
+    // A smaller square immediately around the fountain; roads carry the eye
+    // (and the player) out to each spread-out building from here.
+    const plazaW = 260;
+    const plazaH = 220;
     const plaza = this.g();
     plaza.fillStyle(0xc9a973, 1).fillEllipse(plazaW / 2, plazaH / 2, plazaW, plazaH);
     plaza.fillStyle(0xb8925c, 0.5);
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 30; i++) {
       plaza.fillCircle(
         Phaser.Math.Between(10, plazaW - 10),
         Phaser.Math.Between(10, plazaH - 10),
@@ -688,12 +767,22 @@ export class BootScene extends Phaser.Scene {
     plaza.generateTexture("dirt-plaza", plazaW, plazaH);
     plaza.destroy();
 
+    // A tileable cobbled road strip, used with a TileSprite along each path.
+    let g = this.g();
+    g.fillStyle(0xa89878, 1).fillRect(0, 0, 32, 32);
+    g.fillStyle(0x93836a, 0.6);
+    g.fillRect(2, 2, 12, 10).fillRect(18, 4, 10, 12).fillRect(4, 18, 10, 10).fillRect(18, 20, 12, 8);
+    g.lineStyle(1, 0x6b5a42, 0.5);
+    g.strokeRect(2, 2, 12, 10).strokeRect(18, 4, 10, 12).strokeRect(4, 18, 10, 10).strokeRect(18, 20, 12, 8);
+    g.generateTexture("road-tile", 32, 32);
+    g.destroy();
+
     this.makeGeneralStoreTexture();
     this.makeBlacksmithTexture();
     this.makeCarpenterTexture();
     this.makeMagicShopTexture();
 
-    let g = this.g();
+    g = this.g();
     g.fillStyle(0x8a6a4a, 1).fillRect(0, 0, 90, 40);
     g.lineStyle(1, 0x5a3a20, 0.6);
     for (let i = 0; i <= 90; i += 10) g.lineBetween(i, 0, i, 40);
@@ -707,6 +796,41 @@ export class BootScene extends Phaser.Scene {
     g.lineStyle(2, 0x6b4423, 1).lineBetween(18, 7, 18, -10);
     g.fillStyle(0xe8e0d0, 0.95).fillTriangle(18, -10, 18, 6, 32, 6);
     g.generateTexture("boat", 40, 20);
+    g.destroy();
+
+    // Lamppost.
+    g = this.g();
+    g.fillStyle(0x000000, 0.2).fillEllipse(9, 49, 12, 3);
+    g.fillStyle(0x2b2320, 1).fillRect(7, 20, 4, 29).fillRoundedRect(1, 14, 16, 8, 2);
+    g.fillStyle(0xffe066, 0.9).fillCircle(9, 12, 7);
+    g.fillStyle(0xfff3c0, 0.6).fillCircle(9, 12, 3);
+    g.fillStyle(0x2b2320, 1).fillTriangle(2, 6, 16, 6, 9, -4);
+    g.generateTexture("lamppost", 18, 50);
+    g.destroy();
+
+    // Bench.
+    g = this.g();
+    g.fillStyle(0x000000, 0.2).fillEllipse(20, 27, 34, 5);
+    g.fillStyle(0x6b4423, 1).fillRect(2, 6, 36, 5).fillRect(2, 15, 36, 5);
+    g.fillStyle(0x3a2a1a, 1).fillRect(2, 0, 4, 21).fillRect(34, 0, 4, 21).fillRect(2, 21, 4, 5).fillRect(34, 21, 4, 5);
+    g.generateTexture("bench", 40, 26);
+    g.destroy();
+
+    // A large stone fountain for the plaza center.
+    g = this.g();
+    const fw = 110;
+    const fh = 100;
+    g.fillStyle(0x000000, 0.25).fillEllipse(fw / 2, fh - 8, fw * 0.82, 16);
+    g.fillStyle(0x9d9da7, 1).fillEllipse(fw / 2, fh / 2 + 12, fw - 6, fh - 8);
+    g.fillStyle(0x7d7d87, 1).fillEllipse(fw / 2, fh / 2 + 10, fw - 22, fh - 26);
+    g.fillStyle(0x4a90c9, 0.85).fillEllipse(fw / 2, fh / 2 + 10, fw - 34, fh - 38);
+    g.fillStyle(0x6bb4e8, 0.55).fillEllipse(fw / 2, fh / 2 + 6, fw - 46, fh - 50);
+    g.fillStyle(0x9d9da7, 1).fillEllipse(fw / 2, fh / 2 - 6, 28, 16);
+    g.fillStyle(0x7d7d87, 1).fillRect(fw / 2 - 6, fh / 2 - 30, 12, 26);
+    g.fillStyle(0xcfe3f2, 0.95).fillCircle(fw / 2, fh / 2 - 32, 8);
+    g.fillStyle(0x8ab4e8, 0.85);
+    g.fillCircle(fw / 2 - 5, fh / 2 - 42, 2).fillCircle(fw / 2 + 4, fh / 2 - 46, 2).fillCircle(fw / 2, fh / 2 - 50, 2);
+    g.generateTexture("fountain", fw, fh);
     g.destroy();
   }
 
