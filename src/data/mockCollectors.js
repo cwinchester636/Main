@@ -81,4 +81,34 @@ export const MOCK_COLLECTORS = [
   ], [
     'pkmn-charizard-base', 'pkmn-machamp-base', 'mtg-ragavan', 'spt-trout-bowman',
   ]),
+  collector('u15', 'Kenji O.', '🐧', 0.6, [
+    'ygo-blue-eyes', 'ygo-dark-magician', 'ygo-red-eyes', 'ygo-pot-of-greed', 'ygo-raigeki',
+  ], [
+    'ygo-exodia', 'ygo-black-luster', 'op-luffy-leader', 'ua-gojo',
+  ]),
+  collector('u16', 'Aiko S.', '🐹', 1.3, [
+    'ygo-exodia', 'ygo-mirror-force', 'op-zoro', 'op-nami', 'op-shanks',
+  ], [
+    'ygo-blue-eyes', 'op-luffy-leader', 'ua-tanjiro', 'ygo-jinzo',
+  ]),
+  collector('u17', 'Mateo R.', '🐶', 2.0, [
+    'op-luffy-leader', 'op-law-leader', 'op-ace', 'op-kaido', 'op-sanji',
+  ], [
+    'op-shanks', 'op-yamato', 'ua-luffy', 'ygo-summoned-skull',
+  ]),
+  collector('u18', 'Yuna P.', '🐱', 0.4, [
+    'ua-gojo', 'ua-yuji', 'ua-tanjiro', 'ua-nezuko', 'ua-ichigo',
+  ], [
+    'ua-lelouch', 'ua-levi', 'ygo-ash-blossom', 'op-robin',
+  ]),
+  collector('u19', 'Theo B.', '🐷', 3.4, [
+    'ua-lelouch', 'ua-cc', 'ua-levi', 'ua-eren', 'mtg-tarmogoyf',
+  ], [
+    'ua-gojo', 'ua-yuji', 'spt-mahomes-panini', 'ygo-ancient-gear-golem',
+  ]),
+  collector('u20', 'Sana K.', '🐴', 1.8, [
+    'ygo-jinzo', 'op-mihawk', 'ua-rukia', 'op-hancock', 'ygo-ancient-gear-golem',
+  ], [
+    'ygo-black-luster', 'op-katakuri', 'ua-bakugo', 'pkmn-charizard-base',
+  ]),
 ]
