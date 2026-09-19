@@ -3,7 +3,7 @@ import { error, handleOptions } from './utils.js'
 import { createAccount, getMe, updateMe } from './routes/accounts.js'
 import { getCollection, addCollectionItem, deleteCollectionItem } from './routes/collection.js'
 import { getMatches } from './routes/matches.js'
-import { proposeTrade, getTrades } from './routes/trades.js'
+import { proposeTrade, getTrades, respondToTrade, confirmTrade } from './routes/trades.js'
 
 export default {
   async fetch(request, env) {
@@ -38,6 +38,15 @@ export default {
 
       if (path === '/api/trades' && request.method === 'GET') return await getTrades(env, account)
       if (path === '/api/trades' && request.method === 'POST') return await proposeTrade(request, env, account)
+
+      const tradeMatch = path.match(/^\/api\/trades\/([^/]+)$/)
+      if (tradeMatch && request.method === 'PATCH') {
+        return await respondToTrade(request, env, account, tradeMatch[1])
+      }
+      const confirmMatch = path.match(/^\/api\/trades\/([^/]+)\/confirm$/)
+      if (confirmMatch && request.method === 'POST') {
+        return await confirmTrade(env, account, confirmMatch[1])
+      }
 
       return error('not found', 404)
     } catch (err) {

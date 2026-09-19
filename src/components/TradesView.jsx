@@ -1,0 +1,107 @@
+import AvatarIcon from './AvatarIcon.jsx'
+
+const STATUS_LABEL = {
+  pending: 'Awaiting response',
+  accepted: 'Accepted — coordinate the swap',
+  declined: 'Declined',
+  completed: 'Trade completed',
+}
+
+function formatDate(ts) {
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function TradeCard({ trade, direction, onRespond, onConfirm }) {
+  const { counterparty, status } = trade
+
+  return (
+    <div className={`trade-card trade-${status}`}>
+      <div className="trade-card-header">
+        <span className="match-avatar"><AvatarIcon value={counterparty.avatar} size={32} /></span>
+        <span className="trade-summary-text">
+          <strong>{counterparty.username}</strong>
+          <span className={`trade-status-badge status-${status}`}>{STATUS_LABEL[status]}</span>
+        </span>
+      </div>
+
+      {status === 'pending' && direction === 'received' && (
+        <div className="trade-actions">
+          <button type="button" className="button primary" onClick={() => onRespond(trade.id, 'accept')}>
+            Accept
+          </button>
+          <button type="button" className="button secondary" onClick={() => onRespond(trade.id, 'decline')}>
+            Decline
+          </button>
+        </div>
+      )}
+
+      {status === 'pending' && direction === 'sent' && (
+        <p className="trade-hint">Waiting for {counterparty.username} to respond.</p>
+      )}
+
+      {status === 'accepted' && !trade.confirmedByMe && (
+        <div className="trade-actions">
+          <button type="button" className="button primary" onClick={() => onConfirm(trade.id)}>
+            Mark trade as complete
+          </button>
+        </div>
+      )}
+
+      {status === 'accepted' && trade.confirmedByMe && !trade.confirmedByThem && (
+        <p className="trade-hint">You confirmed it's done — waiting for {counterparty.username} to confirm too.</p>
+      )}
+
+      {status === 'completed' && (
+        <p className="trade-hint trade-hint-success">
+          ✓ Verified by both sides{trade.completedAt ? ` on ${formatDate(trade.completedAt)}` : ''}.
+        </p>
+      )}
+    </div>
+  )
+}
+
+export default function TradesView({ trades, onRespond, onConfirm }) {
+  const { sent, received } = trades
+  const hasAny = sent.length > 0 || received.length > 0
+
+  if (!hasAny) {
+    return (
+      <div className="view">
+        <h1>Trades</h1>
+        <div className="empty-state">
+          <span className="empty-state-emoji">🤝</span>
+          <p>Propose a trade from the Matches tab to get started. Once a trade is accepted, both sides confirm here after the swap happens.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="view">
+      <h1>Trades</h1>
+      <p className="view-subtitle">A trade only shows as verified once both people confirm it happened.</p>
+
+      {received.length > 0 && (
+        <section className="trades-section">
+          <h2>Received</h2>
+          <div className="trade-list">
+            {received.map((trade) => (
+              <TradeCard key={trade.id} trade={trade} direction="received" onRespond={onRespond} onConfirm={onConfirm} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {sent.length > 0 && (
+        <section className="trades-section">
+          <h2>Sent</h2>
+          <div className="trade-list">
+            {sent.map((trade) => (
+              <TradeCard key={trade.id} trade={trade} direction="sent" onRespond={onRespond} onConfirm={onConfirm} />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}

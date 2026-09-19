@@ -15,13 +15,26 @@ This is a real, deployed full-stack app, not just a demo: a Cloudflare Worker + 
 - **Onboarding** — pick a username, avatar, and optional ZIP code. Creates a real account server-side and returns an auth token (stored only in this browser's localStorage — see **Accounts & auth** below).
 - **My Collection** — search Pokémon, Magic: The Gathering, and Yu-Gi-Oh! and add results to your Have/Want lists. All three search the real, complete live card databases (see **Live card search**).
 - **Matches** — a ranked list of other collectors, computed server-side. 🤝 "Perfect trade match" badges mean a trade needs no cash or shipping either way. Tap a match to see exactly which cards would change hands, then send a trade proposal.
+- **Trades** — respond to (accept/decline) proposals you've received, and confirm proposals you've sent once the swap actually happens. See **Trades & verification** below.
 - **Profile** — update your avatar/ZIP, or log out.
 
 ## Accounts & auth
 
-There's no password or email — deliberately, to avoid standing up an email provider for an MVP. Creating an account generates a random 256-bit token, shown to you once; only its SHA-256 hash is stored server-side (`worker/schema.sql`). The frontend keeps the raw token in `localStorage` and sends it as `Authorization: Bearer <token>` on every request (see `src/api/client.js`).
+There's no password or email — deliberately, to avoid standing up an email provider for an MVP. Creating an account generates a random 256-bit token, shown to you once; only its SHA-256 hash is stored server-side (`worker/migrations/0001_initial_schema.sql`). The frontend keeps the raw token in `localStorage` and sends it as `Authorization: Bearer <token>` on every request (see `src/api/client.js`).
 
 **The real tradeoff this creates: losing the token (clearing browser storage, switching devices) means losing access to that account, with no recovery path.** That's the deliberate MVP simplification — the upgrade path is adding email-based recovery (magic link) later without changing the token-auth mechanism itself, just adding a way to re-issue a token to a verified email.
+
+## Trades & verification
+
+A trade proposal moves through a small lifecycle in `worker/src/routes/trades.js`:
+
+1. **Pending** — proposer sends a proposal (`POST /api/trades`). The recipient sees it under Trades → Received.
+2. **Accepted / declined** — only the recipient can respond (`PATCH /api/trades/:id`). Declining is terminal; a new proposal can always be sent afterwards.
+3. **Completed** — once accepted, either side can tap "Mark trade as complete" (`POST /api/trades/:id/confirm`) after the swap actually happens in person or by mail. **This only flips the trade to "completed" once *both* people have confirmed** — one person tapping the button isn't proof anything happened, it's just a claim. Confirming is idempotent (tapping it twice does nothing the second time), and only the two participants can confirm at all.
+
+There's no "cancel" or "undo" — this is a deliberate MVP scope cut. If a trade falls through after being accepted, it just sits there unconfirmed; nothing currently prunes it.
+
+`completed` isn't a value the `status` column can hold — the column's CHECK constraint (`pending`/`accepted`/`declined`) is intentionally left alone, since SQLite can't alter a CHECK constraint without recreating the table. Instead, "completed" is derived at read time from two nullable timestamp columns (`from_confirmed_at`, `to_confirmed_at`) both being set on an `accepted` row. See `worker/migrations/0002_trade_confirmations.sql`.
 
 ## Matching & proximity
 
@@ -45,7 +58,7 @@ If a live API is unreachable, the picker shows a warning and falls back to a sma
 
 ## What's been verified vs. what hasn't
 
-- **Verified end-to-end, locally, against the real backend code:** account creation, auth, adding/removing collection items, server-side matching (including the mutual-match and proximity logic), trade proposals (including idempotent re-proposing), profile updates, and session persistence across a page reload — all driven through the actual UI in a real browser against the Worker running locally with D1's local emulation.
+- **Verified end-to-end, locally, against the real backend code:** account creation, auth, adding/removing collection items, server-side matching (including the mutual-match and proximity logic), the full trade lifecycle (propose → accept/decline → mutual confirm → completed, including idempotent re-proposing, idempotent re-confirming, and every authorization guard — only the recipient can accept/decline, only participants can confirm, only an accepted trade can be confirmed), profile updates, and session persistence across a page reload — all driven through the actual UI (or, for the trade-lifecycle authorization edge cases, directly against the Worker API) against Wrangler running locally with D1's local emulation.
 - **Verified in production:** both Workers are deployed and live — the API at `https://swapdeck-api.cwinchester636.workers.dev` (bound to the real `swapdeck` D1 database, 3 seed accounts already in it) and the frontend at its custom domain, `https://swapdeck.cards` (built with `VITE_API_BASE_URL` pointing at that same API). Confirmed via the Cloudflare API (`workers_get_worker` for both `swapdeck-api` and `swapdeck`) and successful GitHub Actions runs, including the custom-domain route itself (Action log: `Deployed swapdeck triggers ... swapdeck.cards (custom domain)`) — this sandbox's own network policy blocks outbound requests to both `workers.dev` and `swapdeck.cards`, so a direct `curl` from here isn't possible, but every deploy is real and independently confirmed on Cloudflare's side.
 - **Not yet verified:** the three live card-search APIs against the real internet (see **Live card search** above) — same sandbox network restriction, so only their error-fallback path has been exercised for real. Worth a smoke test from a normal browser.
 
@@ -54,7 +67,7 @@ If a live API is unreachable, the picker shows a warning and falls back to a sma
 Both the API and the frontend auto-deploy via GitHub Actions on every push to `main` (or `claude/simple-app-ideas-1y7kvr`, this branch) that touches their files — `.github/workflows/deploy-worker.yml` for `worker/`, `.github/workflows/deploy-frontend.yml` for everything else (`src/`, `index.html`, `wrangler.jsonc`, `.env`) — or manually via **Actions → (workflow name) → Run workflow**. One-time setup (already done for this deployment):
 
 1. Repo secrets (Settings → Secrets and variables → Actions → **Repository secrets**, not Environment secrets): `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-2. The token needs **four** permissions, not the two you'd guess from Cloudflare's docs — the extra two matter specifically for `wrangler d1 execute --remote`'s auth check:
+2. The token needs **four** permissions, not the two you'd guess from Cloudflare's docs — the extra two matter specifically for `wrangler d1 migrations apply --remote`'s auth check:
 
    | Resource | Item | Permission |
    |---|---|---|
@@ -66,6 +79,7 @@ Both the API and the frontend auto-deploy via GitHub Actions on every push to `m
 3. A `workers.dev` subdomain registered on the account (one-time, free, done via the Cloudflare dashboard's Workers & Pages onboarding).
 4. `actions/setup-node` **must use Node ≥22**. At Node 20, `cloudflare/wrangler-action` silently installs Wrangler 3.x instead of the 4.x this project actually targets, and Wrangler 3.x fails the `/memberships` auth check against a scoped API token in a way that looks identical to a bad token — this cost the most debugging time of anything above, so it's worth calling out on its own.
 5. **A local `wrangler` devDependency pin (`"wrangler": "^4.0.0"`) in whichever `package.json` the deploy runs from.** `wrangler-action` only respects a project's own pinned version if one exists; with none, it silently falls back to an old default (3.90.0 in testing) regardless of Node version. That default can't do assets-only deploys at all (fails with "Missing entry-point"), which is exactly what hit the frontend deploy even after the Node fix above — both `worker/package.json` and the root `package.json` need this pin.
+6. **Schema changes go through `worker/migrations/`, applied via `wrangler d1 migrations apply swapdeck --remote --config ./wrangler.toml`** (see `deploy-worker.yml`) — not a single hand-idempotent `schema.sql` run on every deploy (the original approach, before trades needed a schema change). Wrangler tracks which migration files have already run in a `d1_migrations` bookkeeping table on the database itself, so re-running the same command on every future deploy only ever applies files it hasn't seen yet — no risk of a second `ALTER TABLE ADD COLUMN` erroring on an already-migrated database. **The `--config ./wrangler.toml` flag is required**, even when running from inside `worker/` where that's the only config file around: omitting it made Wrangler 4.135.0 resolve `migrations_dir` against the repo root instead of the directory containing `wrangler.toml`, so it reported "no migrations present" even with `migrations_dir = "migrations"` set correctly. Passing `--config` explicitly sidesteps whatever's causing that resolution bug.
 
 The frontend is a plain static-assets Worker (`wrangler.jsonc`, no `main` script, no bindings) built from `dist/` — Cloudflare's own guidance for this is `migrate_pages_to_workers_guide` (Pages is legacy; this is the current recommended path for a project with no server-side routes). The API's URL needs to be set as `VITE_API_BASE_URL` before building the frontend — already done here via a committed `.env` (see **Accounts & auth** — this value isn't a secret, the client has to know it regardless, so per Vite's convention it's checked in rather than left as a local-only override).
 
@@ -91,7 +105,7 @@ npm run lint      # oxlint
 ```bash
 cd worker
 npm install
-npm run migrate:local   # apply schema.sql to a local SQLite file
+npm run migrate:local   # apply worker/migrations/*.sql to a local SQLite file
 npm run dev              # wrangler dev on :8787
 ```
 
@@ -104,7 +118,7 @@ npm run dev              # wrangler dev on :8787
 - `src/hooks/useCardSearch.js` — debounces a query, merges curated + live results, exposes loading/error state.
 - `src/hooks/useLocalStorage.js` — persists the auth token on-device.
 - `src/utils/rarity.js` — maps each live API's rarity vocabulary onto the app's 5-bucket scale.
-- `src/components/` — `Onboarding`, `BottomNav`, `HomeView`, `CollectionView`, `CardPicker`, `CardChip`, `MatchesView`, `ProfileView`.
+- `src/components/` — `Onboarding`, `BottomNav`, `HomeView`, `CollectionView`, `CardPicker`, `CardChip`, `MatchesView`, `TradesView`, `ProfileView`, `AvatarPicker`, `AvatarIcon`.
 - `src/App.jsx` — auth/session orchestration, data fetching, tab navigation.
 
 **Frontend deploy**
@@ -112,7 +126,7 @@ npm run dev              # wrangler dev on :8787
 - `.env` — `VITE_API_BASE_URL`, checked in since it's not a secret.
 
 **Backend (`worker/`)**
-- `worker/schema.sql` — D1 schema (`accounts`, `collection_items`, `trade_proposals`), idempotent.
+- `worker/migrations/` — D1 schema, applied via Wrangler's tracked migrations system (`0001_initial_schema.sql` — `accounts`, `collection_items`, `trade_proposals`; `0002_trade_confirmations.sql` — adds mutual trade-completion tracking).
 - `worker/src/index.js` — router.
 - `worker/src/auth.js` — bearer-token authentication.
 - `worker/src/routes/` — `accounts.js`, `collection.js`, `matches.js`, `trades.js`.
@@ -120,5 +134,5 @@ npm run dev              # wrangler dev on :8787
 - `worker/wrangler.toml` — Worker config, including the real D1 database binding.
 
 **CI**
-- `.github/workflows/deploy-worker.yml` — applies the D1 schema and deploys the API Worker.
+- `.github/workflows/deploy-worker.yml` — applies pending D1 migrations and deploys the API Worker.
 - `.github/workflows/deploy-frontend.yml` — builds the Vite app and deploys it as a static-assets Worker.

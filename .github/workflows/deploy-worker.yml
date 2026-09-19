@@ -22,15 +22,16 @@ jobs:
         working-directory: worker
         run: npm ci
 
-      # Idempotent (schema.sql uses CREATE TABLE/INDEX IF NOT EXISTS), so
-      # running it on every deploy is safe even when nothing changed.
-      - name: Apply D1 schema
+      # Wrangler tracks which files in worker/migrations/ have already run
+      # (in a d1_migrations bookkeeping table), so this only applies new
+      # ones — safe to run on every deploy even when nothing changed.
+      - name: Apply D1 migrations
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          command: d1 execute swapdeck --remote --file=./schema.sql
+          command: d1 migrations apply swapdeck --remote --config ./wrangler.toml
 
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3

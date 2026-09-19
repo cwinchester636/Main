@@ -659,6 +659,93 @@
   color: var(--ink-soft);
 }
 
+/* Trades */
+.trades-section + .trades-section {
+  margin-top: 20px;
+}
+
+.trades-section h2 {
+  font-size: 1.05rem;
+  margin: 0 0 10px;
+}
+
+.trade-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trade-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trade-card.trade-completed {
+  border-color: var(--success);
+}
+
+.trade-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trade-summary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trade-status-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink-soft);
+}
+
+.trade-status-badge.status-accepted {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.trade-status-badge.status-completed {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.trade-status-badge.status-declined {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.trade-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.trade-actions .button {
+  flex: 1;
+}
+
+.trade-hint {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.trade-hint-success {
+  color: var(--success);
+  font-weight: 600;
+}
+
 /* Profile */
 .avatar-picker {
   margin-bottom: 12px;

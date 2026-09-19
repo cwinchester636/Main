@@ -47,4 +47,8 @@ export const api = {
   getTrades: (token) => request('/api/trades', { token }),
   proposeTrade: (token, toAccountId) =>
     request('/api/trades', { method: 'POST', token, body: { toAccountId } }),
+  respondToTrade: (token, tradeId, action) =>
+    request(`/api/trades/${tradeId}`, { method: 'PATCH', token, body: { action } }),
+  confirmTrade: (token, tradeId) =>
+    request(`/api/trades/${tradeId}/confirm`, { method: 'POST', token }),
 }

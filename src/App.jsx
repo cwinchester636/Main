@@ -6,6 +6,7 @@ import BottomNav from './components/BottomNav.jsx'
 import HomeView from './components/HomeView.jsx'
 import CollectionView from './components/CollectionView.jsx'
 import MatchesView from './components/MatchesView.jsx'
+import TradesView from './components/TradesView.jsx'
 import ProfileView from './components/ProfileView.jsx'
 import './App.css'
 
@@ -104,7 +105,22 @@ export default function App() {
     setTrades(tradeData)
   }
 
-  const proposedAccountIds = trades.sent.filter((t) => t.status === 'pending').map((t) => t.counterparty.id)
+  const respondToTrade = async (tradeId, action) => {
+    await api.respondToTrade(token, tradeId, action)
+    const tradeData = await api.getTrades(token)
+    setTrades(tradeData)
+  }
+
+  const confirmTrade = async (tradeId) => {
+    await api.confirmTrade(token, tradeId)
+    const tradeData = await api.getTrades(token)
+    setTrades(tradeData)
+  }
+
+  const proposedAccountIds = trades.sent
+    .filter((t) => t.status === 'pending' || t.status === 'accepted' || t.status === 'completed')
+    .map((t) => t.counterparty.id)
+  const tradeBadge = trades.received.filter((t) => t.status === 'pending').length
 
   return (
     <div className="app-shell">
@@ -131,11 +147,19 @@ export default function App() {
               onPropose={proposeTrade}
             />
           )}
+          {tab === 'trades' && (
+            <TradesView trades={trades} onRespond={respondToTrade} onConfirm={confirmTrade} />
+          )}
           {tab === 'profile' && (
             <ProfileView account={account} onUpdate={updateProfile} onLogOut={logOut} />
           )}
         </main>
-        <BottomNav active={tab} onChange={setTab} matchBadge={matches.filter((m) => m.isMutual).length} />
+        <BottomNav
+          active={tab}
+          onChange={setTab}
+          matchBadge={matches.filter((m) => m.isMutual).length}
+          tradeBadge={tradeBadge}
+        />
       </div>
     </div>
   )

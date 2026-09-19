@@ -59,7 +59,7 @@ function MatchCard({ match, isProposed, onPropose }) {
               setProposing(false)
             }}
           >
-            {isProposed ? '✓ Trade proposal sent' : `Propose trade to ${account.username}`}
+            {isProposed ? '✓ Trade in progress — see Trades tab' : `Propose trade to ${account.username}`}
           </button>
         </div>
       )}
