@@ -2,7 +2,7 @@ name: Deploy SwapDeck API
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/simple-app-ideas-1y7kvr]
     paths:
       - "worker/**"
       - ".github/workflows/deploy-worker.yml"
