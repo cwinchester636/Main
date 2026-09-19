@@ -1,3 +1,5 @@
+import AvatarIcon from './AvatarIcon.jsx'
+
 const PROXIMITY_LABEL = ['Same ZIP code', 'Nearby (same area)', null]
 
 export default function HomeView({ account, haves, wants, matches, onNavigate }) {
@@ -6,7 +8,10 @@ export default function HomeView({ account, haves, wants, matches, onNavigate })
 
   return (
     <div className="view">
-      <h1>Hey {account.username} {account.avatar}</h1>
+      <h1 className="home-heading">
+        <span>Hey {account.username}</span>
+        <AvatarIcon value={account.avatar} size={28} />
+      </h1>
       <p className="view-subtitle">Here's what's happening with your trade circle today.</p>
 
       <div className="stat-row">
@@ -47,7 +52,7 @@ export default function HomeView({ account, haves, wants, matches, onNavigate })
                 className="preview-row"
                 onClick={() => onNavigate('matches')}
               >
-                <span className="match-avatar" aria-hidden="true">{match.account.avatar}</span>
+                <span className="match-avatar"><AvatarIcon value={match.account.avatar} size={32} /></span>
                 <span className="preview-row-text">
                   <strong>{match.account.username}</strong>
                   {PROXIMITY_LABEL[match.proximity] && (

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AVATARS } from '../data/avatars.js'
+import AvatarPicker from './AvatarPicker.jsx'
 import { ApiError } from '../api/client.js'
 
 export default function ProfileView({ account, onUpdate, onLogOut }) {
@@ -41,19 +41,7 @@ export default function ProfileView({ account, onUpdate, onLogOut }) {
       />
 
       <p className="field-label">Avatar</p>
-      <div className="avatar-grid">
-        {AVATARS.map((a) => (
-          <button
-            key={a}
-            type="button"
-            className={`avatar-option${avatar === a ? ' selected' : ''}`}
-            onClick={() => setAvatar(a)}
-            aria-label={`Choose avatar ${a}`}
-          >
-            {a}
-          </button>
-        ))}
-      </div>
+      <AvatarPicker value={avatar} onChange={setAvatar} />
 
       {error && <p className="form-error">{error}</p>}
       {saved && !dirty && <p className="form-success">Saved.</p>}

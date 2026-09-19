@@ -73,6 +73,17 @@
   margin: 4px 0 4px;
 }
 
+.home-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar-fallback {
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .view-subtitle {
   color: var(--ink-soft);
   margin: 0 0 20px;
@@ -583,7 +594,9 @@
 }
 
 .match-avatar {
-  font-size: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
@@ -647,20 +660,42 @@
 }
 
 /* Profile */
+.avatar-picker {
+  margin-bottom: 12px;
+}
+
+.avatar-category {
+  margin-bottom: 14px;
+}
+
+.avatar-category-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin: 0 0 6px;
+}
+
 .avatar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 8px;
-  margin-bottom: 20px;
 }
 
 .avatar-option {
   aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--radius-sm);
   border: 2px solid transparent;
   background: var(--bg);
-  font-size: 1.3rem;
+  padding: 3px;
   cursor: pointer;
+}
+
+.avatar-option svg {
+  width: 100%;
+  height: 100%;
 }
 
 .avatar-option.selected {
@@ -722,6 +757,6 @@
 
 @media (max-width: 380px) {
   .avatar-grid {
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(5, 1fr);
   }
 }

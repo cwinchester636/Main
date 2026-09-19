@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import CardChip from './CardChip.jsx'
+import AvatarIcon from './AvatarIcon.jsx'
 
 const PROXIMITY_LABEL = ['Same ZIP code', 'Nearby (same area)', null]
 
@@ -12,7 +13,7 @@ function MatchCard({ match, isProposed, onPropose }) {
   return (
     <div className={`match-card${isMutual ? ' mutual' : ''}`}>
       <button type="button" className="match-card-summary" onClick={() => setOpen((v) => !v)}>
-        <span className="match-avatar" aria-hidden="true">{account.avatar}</span>
+        <span className="match-avatar"><AvatarIcon value={account.avatar} size={36} /></span>
         <span className="match-summary-text">
           <span className="match-name-row">
             <strong>{account.username}</strong>

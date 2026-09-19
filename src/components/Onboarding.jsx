@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { AVATARS } from '../data/avatars.js'
+import { ALL_AVATAR_ICONS } from '../data/avatarIcons.js'
+import AvatarPicker from './AvatarPicker.jsx'
 import { api, ApiError } from '../api/client.js'
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/
@@ -7,7 +8,7 @@ const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/
 export default function Onboarding({ onComplete }) {
   const [username, setUsername] = useState('')
   const [zip, setZip] = useState('')
-  const [avatar, setAvatar] = useState(AVATARS[0])
+  const [avatar, setAvatar] = useState(ALL_AVATAR_ICONS[0].id)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -59,19 +60,7 @@ export default function Onboarding({ onComplete }) {
           />
 
           <p className="field-label">Pick an avatar</p>
-          <div className="avatar-grid">
-            {AVATARS.map((a) => (
-              <button
-                key={a}
-                type="button"
-                className={`avatar-option${avatar === a ? ' selected' : ''}`}
-                onClick={() => setAvatar(a)}
-                aria-label={`Choose avatar ${a}`}
-              >
-                {a}
-              </button>
-            ))}
-          </div>
+          <AvatarPicker value={avatar} onChange={setAvatar} />
 
           {error && <p className="form-error">{error}</p>}
 
