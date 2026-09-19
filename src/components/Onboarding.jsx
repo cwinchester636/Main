@@ -1,13 +1,32 @@
 import { useState } from 'react'
 import { AVATARS } from '../data/avatars.js'
+import { api, ApiError } from '../api/client.js'
+
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/
 
 export default function Onboarding({ onComplete }) {
-  const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
+  const [zip, setZip] = useState('')
   const [avatar, setAvatar] = useState(AVATARS[0])
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
-    onComplete({ name: name.trim() || 'Collector', avatar })
+    if (!USERNAME_RE.test(username.trim())) {
+      setError('Username must be 3-20 characters: letters, numbers, or underscore.')
+      return
+    }
+    setError('')
+    setSubmitting(true)
+    try {
+      const { account, token } = await api.createAccount({ username: username.trim(), avatar, zip: zip.trim() })
+      onComplete({ account, token })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -18,15 +37,25 @@ export default function Onboarding({ onComplete }) {
         <p>Find nearby collectors who have what you want — and want what you have.</p>
 
         <form onSubmit={submit}>
-          <label className="field-label" htmlFor="onboard-name">What should we call you?</label>
+          <label className="field-label" htmlFor="onboard-username">Choose a username</label>
           <input
-            id="onboard-name"
+            id="onboard-username"
             type="text"
             className="text-input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Your name"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="e.g. card_collector_42"
             autoFocus
+          />
+
+          <label className="field-label" htmlFor="onboard-zip">ZIP code (optional)</label>
+          <input
+            id="onboard-zip"
+            type="text"
+            className="text-input"
+            value={zip}
+            onChange={(e) => setZip(e.target.value)}
+            placeholder="Used only to show how close a match is"
           />
 
           <p className="field-label">Pick an avatar</p>
@@ -44,7 +73,11 @@ export default function Onboarding({ onComplete }) {
             ))}
           </div>
 
-          <button type="submit" className="button primary full">Get started</button>
+          {error && <p className="form-error">{error}</p>}
+
+          <button type="submit" className="button primary full" disabled={submitting}>
+            {submitting ? 'Creating account…' : 'Get started'}
+          </button>
         </form>
       </div>
     </div>

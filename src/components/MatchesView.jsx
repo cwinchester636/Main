@@ -1,18 +1,22 @@
 import { useState } from 'react'
 import CardChip from './CardChip.jsx'
 
+const PROXIMITY_LABEL = ['Same ZIP code', 'Nearby (same area)', null]
+
 function MatchCard({ match, isProposed, onPropose }) {
   const [open, setOpen] = useState(false)
-  const { collector, theyHaveYouWant, youHaveTheyWant, isMutual } = match
+  const [proposing, setProposing] = useState(false)
+  const { account, theyHaveYouWant, youHaveTheyWant, isMutual, proximity } = match
+  const proximityLabel = PROXIMITY_LABEL[proximity]
 
   return (
     <div className={`match-card${isMutual ? ' mutual' : ''}`}>
       <button type="button" className="match-card-summary" onClick={() => setOpen((v) => !v)}>
-        <span className="match-avatar" aria-hidden="true">{collector.avatar}</span>
+        <span className="match-avatar" aria-hidden="true">{account.avatar}</span>
         <span className="match-summary-text">
           <span className="match-name-row">
-            <strong>{collector.name}</strong>
-            <span className="match-distance">{collector.distanceMi} mi</span>
+            <strong>{account.username}</strong>
+            {proximityLabel && <span className="match-distance">{proximityLabel}</span>}
           </span>
           <span className={`match-badge ${isMutual ? 'badge-mutual' : 'badge-partial'}`}>
             {isMutual ? '🤝 Perfect trade match' : theyHaveYouWant.length > 0 ? 'Has cards you want' : 'Wants cards you have'}
@@ -47,10 +51,14 @@ function MatchCard({ match, isProposed, onPropose }) {
           <button
             type="button"
             className={`button ${isProposed ? 'secondary' : 'primary'} full`}
-            disabled={isProposed}
-            onClick={() => onPropose(collector.id)}
+            disabled={isProposed || proposing}
+            onClick={async () => {
+              setProposing(true)
+              await onPropose(account.id)
+              setProposing(false)
+            }}
           >
-            {isProposed ? '✓ Trade proposal sent' : `Propose trade to ${collector.name.split(' ')[0]}`}
+            {isProposed ? '✓ Trade proposal sent' : `Propose trade to ${account.username}`}
           </button>
         </div>
       )}
@@ -58,7 +66,7 @@ function MatchCard({ match, isProposed, onPropose }) {
   )
 }
 
-export default function MatchesView({ matches, hasHaves, hasWants, proposedIds, onPropose }) {
+export default function MatchesView({ matches, hasHaves, hasWants, proposedAccountIds, onPropose }) {
   if (!hasHaves || !hasWants) {
     return (
       <div className="view">
@@ -76,16 +84,16 @@ export default function MatchesView({ matches, hasHaves, hasWants, proposedIds, 
       <h1>Matches</h1>
       <p className="view-subtitle">
         {matches.length > 0
-          ? `${matches.length} nearby collector${matches.length === 1 ? '' : 's'} match your lists.`
-          : 'No matches yet — try adding more cards to your lists.'}
+          ? `${matches.length} collector${matches.length === 1 ? '' : 's'} match your lists.`
+          : 'No matches yet — try adding more cards to your lists, or check back once more collectors join.'}
       </p>
 
       <div className="match-list">
         {matches.map((match) => (
           <MatchCard
-            key={match.collector.id}
+            key={match.account.id}
             match={match}
-            isProposed={proposedIds.includes(match.collector.id)}
+            isProposed={proposedAccountIds.includes(match.account.id)}
             onPropose={onPropose}
           />
         ))}

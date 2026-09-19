@@ -1,0 +1,8 @@
+name = "swapdeck-api"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "swapdeck"
+database_id = "30d86cca-a44d-4300-84e1-2bf9f7dfdc12"
