@@ -3,10 +3,7 @@
 export const GAMES = [
   { id: 'pokemon', label: 'Pokémon', emoji: '⚡' },
   { id: 'mtg', label: 'Magic: The Gathering', emoji: '🔮' },
-  { id: 'sports', label: 'Sports', emoji: '🏀' },
   { id: 'yugioh', label: 'Yu-Gi-Oh!', emoji: '🐉' },
-  { id: 'onepiece', label: 'One Piece Card Game', emoji: '🏴‍☠️' },
-  { id: 'unionarena', label: 'Union Arena', emoji: '⚔️' },
 ]
 
 export const RARITIES = ['common', 'uncommon', 'rare', 'holo-rare', 'ultra-rare']
@@ -53,23 +50,6 @@ export const CARDS = [
   c('mtg-swords-plow', 'Swords to Plowshares', 'mtg', 'Limited Edition', '#20', 'common'),
   c('mtg-elesh-norn', 'Elesh Norn', 'mtg', 'Phyrexia: All Will Be One', '#10', 'holo-rare'),
 
-  // Sports
-  c('spt-jordan-fleer', 'Michael Jordan Rookie', 'sports', '1986 Fleer', '#57', 'ultra-rare'),
-  c('spt-lebron-topps', 'LeBron James Rookie', 'sports', '2003 Topps Chrome', '#111', 'ultra-rare'),
-  c('spt-mantle-topps', 'Mickey Mantle', 'sports', '1952 Topps', '#311', 'ultra-rare'),
-  c('spt-brady-playoff', 'Tom Brady Rookie', 'sports', '2000 Playoff Contenders', '#144', 'ultra-rare'),
-  c('spt-kobe-topps', 'Kobe Bryant Rookie', 'sports', '1996 Topps Chrome', '#138', 'ultra-rare'),
-  c('spt-messi-panini', 'Lionel Messi', 'sports', 'Panini Prizm', '#1', 'holo-rare'),
-  c('spt-curry-panini', 'Stephen Curry', 'sports', 'Panini Select', '#22', 'rare'),
-  c('spt-trout-bowman', 'Mike Trout Rookie', 'sports', '2011 Bowman Chrome', '#BDPP40', 'ultra-rare'),
-  c('spt-ohtani-topps', 'Shohei Ohtani', 'sports', 'Topps Update', '#US1', 'rare'),
-  c('spt-mahomes-panini', 'Patrick Mahomes', 'sports', 'Panini Prizm', '#269', 'holo-rare'),
-  c('spt-griffey-upperdeck', 'Ken Griffey Jr. Rookie', 'sports', '1989 Upper Deck', '#1', 'rare'),
-  c('spt-jeter-topps', 'Derek Jeter Rookie', 'sports', '1993 Topps', '#98', 'rare'),
-  c('spt-wembanyama-panini', 'Victor Wembanyama Rookie', 'sports', 'Panini Prizm', '#1', 'ultra-rare'),
-  c('spt-ronaldo-panini', 'Cristiano Ronaldo', 'sports', 'Panini Obsidian', '#1', 'holo-rare'),
-  c('spt-caitlin-clark', 'Caitlin Clark Rookie', 'sports', 'Panini Prizm', '#201', 'ultra-rare'),
-
   // Yu-Gi-Oh!
   c('ygo-blue-eyes', 'Blue-Eyes White Dragon', 'yugioh', 'Legend of Blue Eyes White Dragon', 'LOB-001', 'ultra-rare'),
   c('ygo-dark-magician', 'Dark Magician', 'yugioh', 'Legend of Blue Eyes White Dragon', 'LOB-005', 'ultra-rare'),
@@ -86,40 +66,6 @@ export const CARDS = [
   c('ygo-ancient-gear-golem', 'Ancient Gear Golem', 'yugioh', 'Invasion of Chaos', 'IOC-020', 'rare'),
   c('ygo-slifer', 'Slifer the Sky Dragon', 'yugioh', 'Collectible Tins Promo', 'MOV-EN001', 'ultra-rare'),
   c('ygo-blue-eyes-ultimate', 'Blue-Eyes Ultimate Dragon', 'yugioh', 'Legend of Blue Eyes White Dragon', 'LOB-127', 'ultra-rare'),
-
-  // One Piece Card Game
-  c('op-luffy-leader', 'Monkey D. Luffy (Leader)', 'onepiece', 'Romance Dawn', 'OP01-001', 'ultra-rare'),
-  c('op-zoro', 'Roronoa Zoro', 'onepiece', 'Romance Dawn', 'OP01-025', 'rare'),
-  c('op-nami', 'Nami', 'onepiece', 'Romance Dawn', 'OP01-016', 'common'),
-  c('op-sanji', 'Sanji', 'onepiece', 'Romance Dawn', 'OP01-013', 'rare'),
-  c('op-chopper', 'Tony Tony Chopper', 'onepiece', 'Romance Dawn', 'OP01-032', 'uncommon'),
-  c('op-robin', 'Nico Robin', 'onepiece', 'Paramount War', 'OP02-069', 'rare'),
-  c('op-law-leader', 'Trafalgar Law (Leader)', 'onepiece', 'Romance Dawn', 'OP01-060', 'ultra-rare'),
-  c('op-shanks', 'Shanks', 'onepiece', 'Romance Dawn', 'OP01-120', 'ultra-rare'),
-  c('op-ace', 'Portgas D. Ace', 'onepiece', 'Starter Deck: Ultra Deck: The Three Brothers', 'ST04-001', 'holo-rare'),
-  c('op-kaido', 'Kaido', 'onepiece', 'Romance Dawn', 'OP01-091', 'ultra-rare'),
-  c('op-mihawk', 'Dracule Mihawk', 'onepiece', 'Paramount War', 'OP02-047', 'rare'),
-  c('op-hancock', 'Boa Hancock', 'onepiece', 'Paramount War', 'OP02-051', 'holo-rare'),
-  c('op-yamato', 'Yamato', 'onepiece', 'Awakening of the New Era', 'OP05-119', 'ultra-rare'),
-  c('op-katakuri', 'Charlotte Katakuri', 'onepiece', 'Pillars of Strength', 'OP03-118', 'holo-rare'),
-  c('op-kid', 'Eustass Kid', 'onepiece', 'Paramount War', 'OP02-058', 'rare'),
-
-  // Union Arena
-  c('ua-naruto', 'Naruto Uzumaki', 'unionarena', 'Naruto Shippuden Booster', 'UA05BT/NRT-1-001', 'ultra-rare'),
-  c('ua-sasuke', 'Sasuke Uchiha', 'unionarena', 'Naruto Shippuden Booster', 'UA05BT/NRT-1-014', 'rare'),
-  c('ua-tanjiro', 'Tanjiro Kamado', 'unionarena', 'Demon Slayer Booster', 'UA02BT/DSL-1-001', 'ultra-rare'),
-  c('ua-nezuko', 'Nezuko Kamado', 'unionarena', 'Demon Slayer Booster', 'UA02BT/DSL-1-004', 'holo-rare'),
-  c('ua-deku', 'Izuku Midoriya', 'unionarena', 'My Hero Academia Booster', 'UA01BT/MHA-1-001', 'ultra-rare'),
-  c('ua-bakugo', 'Katsuki Bakugo', 'unionarena', 'My Hero Academia Booster', 'UA01BT/MHA-1-020', 'rare'),
-  c('ua-yuji', 'Yuji Itadori', 'unionarena', 'Jujutsu Kaisen Booster', 'UA03BT/JJK-1-001', 'ultra-rare'),
-  c('ua-gojo', 'Satoru Gojo', 'unionarena', 'Jujutsu Kaisen Booster', 'UA03BT/JJK-1-050', 'ultra-rare'),
-  c('ua-ichigo', 'Ichigo Kurosaki', 'unionarena', 'Bleach Booster', 'UA04BT/BLC-1-001', 'ultra-rare'),
-  c('ua-rukia', 'Rukia Kuchiki', 'unionarena', 'Bleach Booster', 'UA04BT/BLC-1-012', 'rare'),
-  c('ua-lelouch', 'Lelouch Lamperouge', 'unionarena', 'Code Geass Booster', 'UA06BT/CGS-1-001', 'ultra-rare'),
-  c('ua-cc', 'C.C.', 'unionarena', 'Code Geass Booster', 'UA06BT/CGS-1-010', 'holo-rare'),
-  c('ua-luffy', 'Monkey D. Luffy', 'unionarena', 'One Piece Booster', 'UA07BT/OP-1-001', 'ultra-rare'),
-  c('ua-levi', 'Levi Ackerman', 'unionarena', 'Attack on Titan Booster', 'UA08BT/AOT-1-001', 'ultra-rare'),
-  c('ua-eren', 'Eren Yeager', 'unionarena', 'Attack on Titan Booster', 'UA08BT/AOT-1-014', 'rare'),
 ]
 
 export const cardById = (id) => CARDS.find((card) => card.id === id)

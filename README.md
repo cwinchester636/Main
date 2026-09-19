@@ -1,42 +1,31 @@
 # SwapDeck
 
-A mobile-first web app that helps trading card collectors (Pokémon, Magic: The Gathering, sports cards) find **mutual, in-person trades** with people nearby — instead of shipping costs, grading disputes, and marketplace scams.
+A mobile-first web app that helps trading card collectors (Pokémon, Magic: The Gathering, Yu-Gi-Oh!) find **mutual, in-person trades** with people nearby — instead of shipping costs, grading disputes, and marketplace scams.
 
 You build two lists — **Haves** and **Wants** — and SwapDeck surfaces nearby collectors whose lists complement yours, prioritizing "perfect" matches where *they have what you want* **and** *you have what they want*.
 
 ## How it works
 
 - **Onboarding** — pick a display name and avatar (stored only on your device).
-- **My Collection** — search across **six** card games and add results to your Have/Want lists. Pokémon, Magic: The Gathering, and Yu-Gi-Oh! search the real, complete card databases live (see below); sports, One Piece Card Game, and Union Arena search a curated catalog of well-known cards.
+- **My Collection** — search Pokémon, Magic: The Gathering, and Yu-Gi-Oh! and add results to your Have/Want lists. Every one of these searches the real, complete card database live (see below) — no curated-catalog fallback needed for missing games.
 - **Matches** — a ranked list of nearby collectors. 🤝 "Perfect trade match" badges mean a trade needs no cash or shipping either way. Tap a match to see exactly which cards would change hands, then send a trade proposal.
 - **Profile** — update your name/avatar or reset your collection.
 
 ### Live card search
 
-Search results for Pokémon, MTG, and Yu-Gi-Oh! come from real, free, public card databases, queried directly from the browser (no backend, no API key):
+Search results come from real, free, public card databases, queried directly from the browser (no backend, no API key):
 
 - Pokémon → [Pokemon TCG API](https://docs.pokemontcg.io/)
 - Magic: The Gathering → [Scryfall](https://scryfall.com/docs/api)
 - Yu-Gi-Oh! → [YGOPRODeck](https://ygoprodeck.com/api-guide/)
 
-Sports cards, One Piece Card Game, and Union Arena don't have a comparable free public API, so those stay on the curated catalog in `src/data/cards.js`.
+These three were chosen specifically *because* they're free and CORS-enabled for direct browser use. Sports cards, One Piece Card Game, and Union Arena were dropped from the app — none of them has a comparable free public API, and supporting them would have meant a curated (and much smaller, less accurate) fallback catalog alongside the three live-searched games. Keeping the game list to only what has a real live data source keeps the whole app on one consistent, accurate path instead of a patchwork of live + static data.
 
-If a live API is unreachable (offline, corporate firewall, rate limit), the picker shows a warning and falls back to the curated catalog for that game instead of breaking — see `src/hooks/useCardSearch.js` and `src/data/providers/`.
+If a live API is unreachable (offline, corporate firewall, rate limit), the picker shows a warning and falls back to a small curated catalog for that game instead of breaking — see `src/hooks/useCardSearch.js` and `src/data/providers/`.
 
 **Not yet verified end-to-end against the live APIs.** This was built and unit-tested (`src/data/providers/*Provider.js` export pure `normalize*Card` functions tested against hand-built sample payloads matching each API's documented schema) in a sandboxed environment whose network policy blocks these exact domains, so the request/response wiring has only been exercised via its error-fallback path, not a real successful fetch. It should work as-is (these are the standard, CORS-enabled, no-key APIs used across the hobbyist TCG-app ecosystem for exactly this purpose) — worth a smoke test after your first deploy or local run with normal internet access.
 
-### Card pricing
-
-Cards show an estimated USD value (💰 total on Home, a `$` badge on each card chip and search result) for **One Piece Card Game** and **Union Arena** — the two games that were asked about specifically.
-
-These are **mock values, not live TCGplayer data.** Getting real prices from TCGplayer requires:
-
-1. A [TCGplayer Developer](https://developer.tcgplayer.com/) account and API credentials (`client_id`/`client_secret`) — an approval process, not instant, and not something obtainable from within this session.
-2. A backend to hold that secret and call the API server-side. TCGplayer's API isn't CORS-open for direct browser calls the way the card-search APIs above are, and SwapDeck is currently a fully static app with no server.
-
-Scraping tcgplayer.com's pages directly (instead of using the API) isn't done here because it violates TCGplayer's Terms of Service (they explicitly prohibit automated data harvesting) and wouldn't work from a browser anyway (no CORS support).
-
-`src/data/pricing/mockTcgplayerPricing.js` is shaped exactly like the real Pricing API response (`marketPrice`/`lowPrice`/`midPrice`/`highPrice` in USD) and every price badge in the UI reads through `getCardPrice(cardId)`, so wiring in the real API later — via a backend proxy — means replacing that one function's implementation, not touching any component. It's also worth noting Union Arena is a newer Bandai game; whether it's even listed as a TCGplayer category hasn't been confirmed.
+**Real pricing note:** all three of these APIs also return TCGplayer-sourced market prices in their responses (Pokemon TCG API's `tcgplayer.prices`, Scryfall's `prices.usd`, YGOPRODeck's `card_prices[].tcgplayer_price`) — real accurate values for these three games are available for free with no separate TCGplayer integration, just by reading a field that's already being fetched. That's not wired up yet (the app currently doesn't surface pricing at all after removing the One Piece/Union Arena mock-pricing feature), but it's a small addition whenever it's wanted.
 
 ### Note on "nearby collectors" and matching
 
@@ -53,13 +42,12 @@ npm run lint      # oxlint
 
 ## Project structure
 
-- `src/data/cards.js` — curated card catalog (name/set/number/rarity) and search helper.
+- `src/data/cards.js` — curated card catalog (name/set/number/rarity) and search helper; also backs the mock collectors and the offline fallback.
 - `src/data/providers/` — live search: `pokemonProvider.js`, `mtgProvider.js`, `yugiohProvider.js` (each fetch + normalize to a common card shape), `fetchJson.js` (timeout/abort-aware fetch wrapper), `index.js` (dispatch by game).
 - `src/hooks/useCardSearch.js` — debounces a query, merges curated + live results, exposes loading/error state.
 - `src/data/mockCollectors.js` — mock nearby collectors with Have/Want lists, standing in for a real backend.
 - `src/utils/matching.js` — computes mutual vs. one-directional trade matches via `matchKey()` (game + name).
 - `src/utils/rarity.js` — maps each live API's rarity vocabulary onto the app's 5-bucket scale.
-- `src/data/pricing/mockTcgplayerPricing.js` — mock One Piece / Union Arena card values, shaped like the real TCGplayer Pricing API for an easy future swap.
 - `src/hooks/useLocalStorage.js` — persists your profile, Haves, Wants, and sent proposals on-device.
 - `src/components/` — `Onboarding`, `BottomNav`, `HomeView`, `CollectionView`, `CardPicker`, `CardChip`, `MatchesView`, `ProfileView`.
 - `src/App.jsx` — app shell and tab navigation.

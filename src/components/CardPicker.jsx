@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { GAMES } from '../data/cards.js'
 import { useCardSearch } from '../hooks/useCardSearch.js'
-import { getCardPrice } from '../data/pricing/mockTcgplayerPricing.js'
 
 export default function CardPicker({ title, excludeIds, onAdd, onClose }) {
   const [query, setQuery] = useState('')
@@ -59,31 +58,23 @@ export default function CardPicker({ title, excludeIds, onAdd, onClose }) {
           {visibleResults.length === 0 && (
             <p className="empty-hint">No cards match "{query}". Try another search.</p>
           )}
-          {visibleResults.map((card) => {
-            const price = getCardPrice(card.id)
-            return (
-              <button
-                key={card.id}
-                type="button"
-                className="picker-row"
-                onClick={() => onAdd(card)}
-              >
-                {card.image ? (
-                  <img className="picker-row-image" src={card.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-                ) : null}
-                <span className="picker-row-text">
-                  <span className="picker-row-name">{card.name}</span>
-                  <span className="picker-row-set">{card.set} · {card.number}</span>
-                </span>
-                {price && (
-                  <span className="picker-row-price" title="Estimated value — demo pricing, not live TCGplayer data">
-                    ${price.marketPrice.toFixed(2)}
-                  </span>
-                )}
-                <span className="picker-row-add" aria-hidden="true">+</span>
-              </button>
-            )
-          })}
+          {visibleResults.map((card) => (
+            <button
+              key={card.id}
+              type="button"
+              className="picker-row"
+              onClick={() => onAdd(card)}
+            >
+              {card.image ? (
+                <img className="picker-row-image" src={card.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+              ) : null}
+              <span className="picker-row-text">
+                <span className="picker-row-name">{card.name}</span>
+                <span className="picker-row-set">{card.set} · {card.number}</span>
+              </span>
+              <span className="picker-row-add" aria-hidden="true">+</span>
+            </button>
+          ))}
         </div>
       </div>
     </div>

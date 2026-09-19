@@ -1,13 +1,6 @@
-import { getCardPrice } from '../data/pricing/mockTcgplayerPricing.js'
-
-function estimatedValue(cards) {
-  return cards.reduce((sum, card) => sum + (getCardPrice(card.id)?.marketPrice ?? 0), 0)
-}
-
 export default function HomeView({ profile, haves, wants, matches, onNavigate }) {
   const mutualCount = matches.filter((m) => m.isMutual).length
   const topMatches = matches.slice(0, 3)
-  const havesValue = estimatedValue(haves)
 
   return (
     <div className="view">
@@ -28,12 +21,6 @@ export default function HomeView({ profile, haves, wants, matches, onNavigate })
           <span className="stat-label">Perfect matches</span>
         </div>
       </div>
-
-      {havesValue > 0 && (
-        <p className="value-note" title="Estimated value — demo pricing, not live TCGplayer data">
-          💰 Your Haves are worth an estimated <strong>${havesValue.toFixed(2)}</strong>
-        </p>
-      )}
 
       {(haves.length === 0 || wants.length === 0) && (
         <div className="callout">
