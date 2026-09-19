@@ -4,7 +4,11 @@ A mobile-first web app that helps trading card collectors (Pokémon, Magic: The 
 
 You build two lists — **Haves** and **Wants** — and SwapDeck surfaces other collectors whose lists complement yours, prioritizing "perfect" matches where *they have what you want* **and** *you have what they want*.
 
-This is a real, deployable full-stack app: a Cloudflare Worker + D1 database backend (`worker/`) behind a real (if lightweight) account system, and a React/Vite frontend (`src/`) that talks to it. There's no mock data left anywhere in the app — every account, collection, and match is a real row in a real database.
+This is a real, deployed full-stack app, not just a demo: a Cloudflare Worker + D1 database backend (`worker/`) behind a real (if lightweight) account system, and a React/Vite frontend (`src/`) served as static assets from its own Worker. There's no mock data left anywhere in the app — every account, collection, and match is a real row in a real database.
+
+**Live right now:**
+- Frontend: **https://swapdeck.cwinchester636.workers.dev**
+- API: **https://swapdeck-api.cwinchester636.workers.dev**
 
 ## How it works
 
@@ -42,12 +46,12 @@ If a live API is unreachable, the picker shows a warning and falls back to a sma
 ## What's been verified vs. what hasn't
 
 - **Verified end-to-end, locally, against the real backend code:** account creation, auth, adding/removing collection items, server-side matching (including the mutual-match and proximity logic), trade proposals (including idempotent re-proposing), profile updates, and session persistence across a page reload — all driven through the actual UI in a real browser against the Worker running locally with D1's local emulation.
-- **Verified in production:** the Worker is deployed and live at **`https://swapdeck-api.cwinchester636.workers.dev`**, bound to the real `swapdeck` D1 database (3 seed accounts already in it). Confirmed via the Cloudflare API and a successful GitHub Actions run (`.github/workflows/deploy-worker.yml`, run #9) — this sandbox's own network policy blocks outbound requests to `workers.dev`, so a direct `curl` from here isn't possible, but the deploy itself is real and independently confirmed.
+- **Verified in production:** both Workers are deployed and live — the API at `https://swapdeck-api.cwinchester636.workers.dev` (bound to the real `swapdeck` D1 database, 3 seed accounts already in it) and the frontend at `https://swapdeck.cwinchester636.workers.dev` (built with `VITE_API_BASE_URL` pointing at that same API). Confirmed via the Cloudflare API (`workers_get_worker` for both `swapdeck-api` and `swapdeck`) and successful GitHub Actions runs — this sandbox's own network policy blocks outbound requests to `workers.dev`, so a direct `curl` from here isn't possible, but both deploys are real and independently confirmed on Cloudflare's side.
 - **Not yet verified:** the three live card-search APIs against the real internet (see **Live card search** above) — same sandbox network restriction, so only their error-fallback path has been exercised for real. Worth a smoke test from a normal browser.
 
 ## Deploying
 
-The Worker auto-deploys via GitHub Actions (`.github/workflows/deploy-worker.yml`) on every push to `main` (or `claude/simple-app-ideas-1y7kvr`, this branch) that touches `worker/`, or via **Actions → Deploy SwapDeck API → Run workflow** for a manual trigger. One-time setup (already done for this deployment):
+Both the API and the frontend auto-deploy via GitHub Actions on every push to `main` (or `claude/simple-app-ideas-1y7kvr`, this branch) that touches their files — `.github/workflows/deploy-worker.yml` for `worker/`, `.github/workflows/deploy-frontend.yml` for everything else (`src/`, `index.html`, `wrangler.jsonc`, `.env`) — or manually via **Actions → (workflow name) → Run workflow**. One-time setup (already done for this deployment):
 
 1. Repo secrets (Settings → Secrets and variables → Actions → **Repository secrets**, not Environment secrets): `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 2. The token needs **four** permissions, not the two you'd guess from Cloudflare's docs — the extra two matter specifically for `wrangler d1 execute --remote`'s auth check:
@@ -60,9 +64,10 @@ The Worker auto-deploys via GitHub Actions (`.github/workflows/deploy-worker.yml
    | User | Memberships | Read |
 
 3. A `workers.dev` subdomain registered on the account (one-time, free, done via the Cloudflare dashboard's Workers & Pages onboarding).
-4. `actions/setup-node` **must use Node ≥22**. At Node 20, `cloudflare/wrangler-action` silently installs Wrangler 3.x instead of the 4.x this project actually targets (ignoring `worker/package.json`'s version pin entirely), and Wrangler 3.x fails the `/memberships` auth check against a scoped API token in a way that looks identical to a bad token — this cost the most debugging time of anything above, so it's worth calling out on its own.
+4. `actions/setup-node` **must use Node ≥22**. At Node 20, `cloudflare/wrangler-action` silently installs Wrangler 3.x instead of the 4.x this project actually targets, and Wrangler 3.x fails the `/memberships` auth check against a scoped API token in a way that looks identical to a bad token — this cost the most debugging time of anything above, so it's worth calling out on its own.
+5. **A local `wrangler` devDependency pin (`"wrangler": "^4.0.0"`) in whichever `package.json` the deploy runs from.** `wrangler-action` only respects a project's own pinned version if one exists; with none, it silently falls back to an old default (3.90.0 in testing) regardless of Node version. That default can't do assets-only deploys at all (fails with "Missing entry-point"), which is exactly what hit the frontend deploy even after the Node fix above — both `worker/package.json` and the root `package.json` need this pin.
 
-The deployed URL is `https://swapdeck-api.<your-subdomain>.workers.dev` (shown in the Action's log). Set it as `VITE_API_BASE_URL` wherever you build/host the frontend (see `.env.example`) — for this deployment, that's `https://swapdeck-api.cwinchester636.workers.dev`.
+The frontend is a plain static-assets Worker (`wrangler.jsonc`, no `main` script, no bindings) built from `dist/` — Cloudflare's own guidance for this is `migrate_pages_to_workers_guide` (Pages is legacy; this is the current recommended path for a project with no server-side routes). The deployed URLs are `https://swapdeck-api.<your-subdomain>.workers.dev` and `https://swapdeck.<your-subdomain>.workers.dev` (shown in each Action's log). The API's URL needs to be set as `VITE_API_BASE_URL` before building the frontend — already done here via a committed `.env` (see **Accounts & auth** — this value isn't a secret, the client has to know it regardless, so per Vite's convention it's checked in rather than left as a local-only override).
 
 ## Development
 
@@ -94,6 +99,10 @@ npm run dev              # wrangler dev on :8787
 - `src/components/` — `Onboarding`, `BottomNav`, `HomeView`, `CollectionView`, `CardPicker`, `CardChip`, `MatchesView`, `ProfileView`.
 - `src/App.jsx` — auth/session orchestration, data fetching, tab navigation.
 
+**Frontend deploy**
+- `wrangler.jsonc` — assets-only Worker config, points at the Vite build output (`./dist`).
+- `.env` — `VITE_API_BASE_URL`, checked in since it's not a secret.
+
 **Backend (`worker/`)**
 - `worker/schema.sql` — D1 schema (`accounts`, `collection_items`, `trade_proposals`), idempotent.
 - `worker/src/index.js` — router.
@@ -103,4 +112,5 @@ npm run dev              # wrangler dev on :8787
 - `worker/wrangler.toml` — Worker config, including the real D1 database binding.
 
 **CI**
-- `.github/workflows/deploy-worker.yml` — applies the schema and deploys the Worker on push to `main`.
+- `.github/workflows/deploy-worker.yml` — applies the D1 schema and deploys the API Worker.
+- `.github/workflows/deploy-frontend.yml` — builds the Vite app and deploys it as a static-assets Worker.
