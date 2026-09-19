@@ -7,7 +7,7 @@ You build two lists — **Haves** and **Wants** — and SwapDeck surfaces other 
 This is a real, deployed full-stack app, not just a demo: a Cloudflare Worker + D1 database backend (`worker/`) behind a real (if lightweight) account system, and a React/Vite frontend (`src/`) served as static assets from its own Worker. There's no mock data left anywhere in the app — every account, collection, and match is a real row in a real database.
 
 **Live right now:**
-- Frontend: **https://swapdeck.cwinchester636.workers.dev**
+- Frontend: **https://swapdeck.cards** (custom domain; the `swapdeck.cwinchester636.workers.dev` fallback is disabled now that a custom domain is configured — see **Custom domain** below)
 - API: **https://swapdeck-api.cwinchester636.workers.dev**
 
 ## How it works
@@ -46,7 +46,7 @@ If a live API is unreachable, the picker shows a warning and falls back to a sma
 ## What's been verified vs. what hasn't
 
 - **Verified end-to-end, locally, against the real backend code:** account creation, auth, adding/removing collection items, server-side matching (including the mutual-match and proximity logic), trade proposals (including idempotent re-proposing), profile updates, and session persistence across a page reload — all driven through the actual UI in a real browser against the Worker running locally with D1's local emulation.
-- **Verified in production:** both Workers are deployed and live — the API at `https://swapdeck-api.cwinchester636.workers.dev` (bound to the real `swapdeck` D1 database, 3 seed accounts already in it) and the frontend at `https://swapdeck.cwinchester636.workers.dev` (built with `VITE_API_BASE_URL` pointing at that same API). Confirmed via the Cloudflare API (`workers_get_worker` for both `swapdeck-api` and `swapdeck`) and successful GitHub Actions runs — this sandbox's own network policy blocks outbound requests to `workers.dev`, so a direct `curl` from here isn't possible, but both deploys are real and independently confirmed on Cloudflare's side.
+- **Verified in production:** both Workers are deployed and live — the API at `https://swapdeck-api.cwinchester636.workers.dev` (bound to the real `swapdeck` D1 database, 3 seed accounts already in it) and the frontend at its custom domain, `https://swapdeck.cards` (built with `VITE_API_BASE_URL` pointing at that same API). Confirmed via the Cloudflare API (`workers_get_worker` for both `swapdeck-api` and `swapdeck`) and successful GitHub Actions runs, including the custom-domain route itself (Action log: `Deployed swapdeck triggers ... swapdeck.cards (custom domain)`) — this sandbox's own network policy blocks outbound requests to both `workers.dev` and `swapdeck.cards`, so a direct `curl` from here isn't possible, but every deploy is real and independently confirmed on Cloudflare's side.
 - **Not yet verified:** the three live card-search APIs against the real internet (see **Live card search** above) — same sandbox network restriction, so only their error-fallback path has been exercised for real. Worth a smoke test from a normal browser.
 
 ## Deploying
@@ -67,7 +67,15 @@ Both the API and the frontend auto-deploy via GitHub Actions on every push to `m
 4. `actions/setup-node` **must use Node ≥22**. At Node 20, `cloudflare/wrangler-action` silently installs Wrangler 3.x instead of the 4.x this project actually targets, and Wrangler 3.x fails the `/memberships` auth check against a scoped API token in a way that looks identical to a bad token — this cost the most debugging time of anything above, so it's worth calling out on its own.
 5. **A local `wrangler` devDependency pin (`"wrangler": "^4.0.0"`) in whichever `package.json` the deploy runs from.** `wrangler-action` only respects a project's own pinned version if one exists; with none, it silently falls back to an old default (3.90.0 in testing) regardless of Node version. That default can't do assets-only deploys at all (fails with "Missing entry-point"), which is exactly what hit the frontend deploy even after the Node fix above — both `worker/package.json` and the root `package.json` need this pin.
 
-The frontend is a plain static-assets Worker (`wrangler.jsonc`, no `main` script, no bindings) built from `dist/` — Cloudflare's own guidance for this is `migrate_pages_to_workers_guide` (Pages is legacy; this is the current recommended path for a project with no server-side routes). The deployed URLs are `https://swapdeck-api.<your-subdomain>.workers.dev` and `https://swapdeck.<your-subdomain>.workers.dev` (shown in each Action's log). The API's URL needs to be set as `VITE_API_BASE_URL` before building the frontend — already done here via a committed `.env` (see **Accounts & auth** — this value isn't a secret, the client has to know it regardless, so per Vite's convention it's checked in rather than left as a local-only override).
+The frontend is a plain static-assets Worker (`wrangler.jsonc`, no `main` script, no bindings) built from `dist/` — Cloudflare's own guidance for this is `migrate_pages_to_workers_guide` (Pages is legacy; this is the current recommended path for a project with no server-side routes). The API's URL needs to be set as `VITE_API_BASE_URL` before building the frontend — already done here via a committed `.env` (see **Accounts & auth** — this value isn't a secret, the client has to know it regardless, so per Vite's convention it's checked in rather than left as a local-only override).
+
+## Custom domain
+
+`swapdeck.cards` is configured declaratively in `wrangler.jsonc` (`routes: [{ pattern: "swapdeck.cards", custom_domain: true }]`) rather than as a manual dashboard step, so it deploys through the same CI pipeline as everything else. Two things worth knowing if you change or add to this:
+
+- **It needs one more token permission beyond the table above:** `Zone → Workers Routes → Edit`, scoped specifically to the `swapdeck.cards` zone. The account-level permissions that cover everything else don't cover this — it's zone-scoped, not account-scoped.
+- **Adding a custom domain silently disables the `workers.dev` URL** unless `workers_dev: true` is explicitly set in `wrangler.jsonc` (confirmed via the deploy log: `Because 'workers_dev' is not in your Wrangler file, it will be disabled for this deployment by default`). `swapdeck.cwinchester636.workers.dev` is no longer reachable as a result — `swapdeck.cards` is the only public URL for the frontend now.
+- Requires the domain to already be an active Cloudflare zone (automatic if bought through Cloudflare's own registrar, as this one was; otherwise the domain needs adding to Cloudflare with a nameserver change first).
 
 ## Development
 
