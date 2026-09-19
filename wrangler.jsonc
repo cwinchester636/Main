@@ -3,5 +3,8 @@
   "compatibility_date": "2025-06-05",
   "assets": {
     "directory": "./dist"
-  }
+  },
+  "routes": [
+    { "pattern": "swapdeck.cards", "custom_domain": true }
+  ]
 }
