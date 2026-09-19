@@ -22,22 +22,6 @@ jobs:
         working-directory: worker
         run: npm ci
 
-      # Temporary diagnostic: confirms the secrets actually reach this job
-      # and reports their length (never their value) to rule out an empty
-      # or malformed secret vs. a genuinely invalid/revoked token. Remove
-      # once the real deploy succeeds.
-      - name: Check secrets are present
-        env:
-          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          echo "CLOUDFLARE_API_TOKEN length: ${#TOKEN}"
-          echo "CLOUDFLARE_ACCOUNT_ID length: ${#ACCOUNT_ID}"
-          if [ -z "$TOKEN" ]; then
-            echo "::error::CLOUDFLARE_API_TOKEN is empty or not set as a repository secret"
-            exit 1
-          fi
-
       # Idempotent (schema.sql uses CREATE TABLE/INDEX IF NOT EXISTS), so
       # running it on every deploy is safe even when nothing changed.
       - name: Apply D1 schema
