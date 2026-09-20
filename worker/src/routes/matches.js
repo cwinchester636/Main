@@ -10,6 +10,8 @@ function serializeCard(row) {
     number: row.number,
     rarity: row.rarity,
     image: row.image,
+    condition: row.condition ?? null,
+    grade: row.grade ?? null,
   }
 }
 

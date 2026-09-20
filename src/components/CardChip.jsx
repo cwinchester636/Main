@@ -1,11 +1,18 @@
 import { useState } from 'react'
 import { GAMES } from '../data/cards.js'
+import { CONDITION_LABEL } from '../data/conditions.js'
 import { useCardPrice } from '../hooks/useCardPrice.js'
 
 const gameEmoji = (gameId) => GAMES.find((g) => g.id === gameId)?.emoji ?? '🃏'
 
 const formatPrice = (amount) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
+
+function conditionText(card) {
+  if (!card.condition) return null
+  if (card.condition === 'graded') return card.grade ? `Graded ${card.grade}/10` : 'Graded'
+  return CONDITION_LABEL[card.condition] ?? null
+}
 
 export default function CardChip({ card, onRemove, compact = false }) {
   const [imageFailed, setImageFailed] = useState(false)
@@ -15,6 +22,7 @@ export default function CardChip({ card, onRemove, compact = false }) {
   // haven't round-tripped through the backend yet (e.g. a fresh search
   // result), where it's still the live id itself.
   const price = useCardPrice(card.sourceId ?? card.id)
+  const condition = conditionText(card)
 
   return (
     <div className={`card-chip rarity-${card.rarity}${compact ? ' compact' : ''}`}>
@@ -34,6 +42,7 @@ export default function CardChip({ card, onRemove, compact = false }) {
           {card.set} · {card.number}
           {price && <span className="card-chip-price"> · {formatPrice(price.amount)}</span>}
         </span>
+        {condition && <span className="card-chip-condition">{condition}</span>}
       </span>
       {onRemove && (
         <button
