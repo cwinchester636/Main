@@ -1,4 +1,4 @@
-import { json, matchKey, zipProximity } from '../utils.js'
+import { json, matchKey, zipProximity, haversineMiles } from '../utils.js'
 
 function serializeCard(row) {
   return {
@@ -24,7 +24,8 @@ export async function getMatches(env, account) {
   if (myHaveKeys.size === 0 && myWantKeys.size === 0) return json({ matches: [] })
 
   const others = await env.DB.prepare(
-    `SELECT ci.*, a.username AS acct_username, a.avatar AS acct_avatar, a.zip AS acct_zip
+    `SELECT ci.*, a.username AS acct_username, a.avatar AS acct_avatar, a.zip AS acct_zip,
+            a.lat AS acct_lat, a.lng AS acct_lng
      FROM collection_items ci
      JOIN accounts a ON a.id = ci.account_id
      WHERE ci.account_id != ?`,
@@ -42,6 +43,8 @@ export async function getMatches(env, account) {
     if (!byAccount.has(row.account_id)) {
       byAccount.set(row.account_id, {
         account: { id: row.account_id, username: row.acct_username, avatar: row.acct_avatar, zip: row.acct_zip },
+        lat: row.acct_lat,
+        lng: row.acct_lng,
         theyHaveYouWant: new Map(),
         youHaveTheyWant: new Map(),
       })
@@ -55,18 +58,30 @@ export async function getMatches(env, account) {
     .map((entry) => {
       const theyHaveYouWant = [...entry.theyHaveYouWant.values()]
       const youHaveTheyWant = [...entry.youHaveTheyWant.values()]
+      const distanceMiles = haversineMiles(account.lat, account.lng, entry.lat, entry.lng)
       return {
         account: entry.account,
         theyHaveYouWant,
         youHaveTheyWant,
         isMutual: theyHaveYouWant.length > 0 && youHaveTheyWant.length > 0,
         score: theyHaveYouWant.length + youHaveTheyWant.length,
+        // Real distance when both sides are geocoded; otherwise the coarse
+        // ZIP-prefix bucket is still returned so the client always has
+        // something to show. See "Matching & proximity" in the README.
+        distanceMiles: distanceMiles === null ? null : Math.round(distanceMiles * 10) / 10,
         proximity: zipProximity(account.zip, entry.account.zip),
       }
     })
+    // A radius only ever narrows results for accounts we could actually
+    // measure — an ungeocoded match is never hidden just because we can't
+    // confirm it's outside the radius.
+    .filter((m) => account.radius_miles == null || m.distanceMiles == null || m.distanceMiles <= account.radius_miles)
     .sort((a, b) => {
       if (a.isMutual !== b.isMutual) return a.isMutual ? -1 : 1
       if (b.score !== a.score) return b.score - a.score
+      if (a.distanceMiles !== null && b.distanceMiles !== null) return a.distanceMiles - b.distanceMiles
+      if (a.distanceMiles !== null) return -1
+      if (b.distanceMiles !== null) return 1
       return a.proximity - b.proximity
     })
 

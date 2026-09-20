@@ -1,6 +1,5 @@
 import AvatarIcon from './AvatarIcon.jsx'
-
-const PROXIMITY_LABEL = ['Same ZIP code', 'Nearby (same area)', null]
+import { distanceLabel } from '../utils/distance.js'
 
 export default function HomeView({ account, haves, wants, matches, onNavigate }) {
   const mutualCount = matches.filter((m) => m.isMutual).length
@@ -55,9 +54,7 @@ export default function HomeView({ account, haves, wants, matches, onNavigate })
                 <span className="match-avatar"><AvatarIcon value={match.account.avatar} size={32} /></span>
                 <span className="preview-row-text">
                   <strong>{match.account.username}</strong>
-                  {PROXIMITY_LABEL[match.proximity] && (
-                    <span className="match-distance">{PROXIMITY_LABEL[match.proximity]}</span>
-                  )}
+                  {distanceLabel(match) && <span className="match-distance">{distanceLabel(match)}</span>}
                 </span>
                 {match.isMutual && <span className="badge-mutual small">🤝 Match</span>}
               </button>

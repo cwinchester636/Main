@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import CardChip from './CardChip.jsx'
 import AvatarIcon from './AvatarIcon.jsx'
-
-const PROXIMITY_LABEL = ['Same ZIP code', 'Nearby (same area)', null]
+import { distanceLabel } from '../utils/distance.js'
 
 function MatchCard({ match, isProposed, onPropose }) {
   const [open, setOpen] = useState(false)
   const [proposing, setProposing] = useState(false)
-  const { account, theyHaveYouWant, youHaveTheyWant, isMutual, proximity } = match
-  const proximityLabel = PROXIMITY_LABEL[proximity]
+  const { account, theyHaveYouWant, youHaveTheyWant, isMutual } = match
+  const proximityLabel = distanceLabel(match)
 
   return (
     <div className={`match-card${isMutual ? ' mutual' : ''}`}>
@@ -86,7 +85,7 @@ export default function MatchesView({ matches, hasHaves, hasWants, proposedAccou
       <p className="view-subtitle">
         {matches.length > 0
           ? `${matches.length} collector${matches.length === 1 ? '' : 's'} match your lists.`
-          : 'No matches yet — try adding more cards to your lists, or check back once more collectors join.'}
+          : 'No matches yet — try adding more cards to your lists, widening your search radius in Profile, or check back once more collectors join.'}
       </p>
 
       <div className="match-list">

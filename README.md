@@ -16,7 +16,7 @@ This is a real, deployed full-stack app, not just a demo: a Cloudflare Worker + 
 - **My Collection** — search Pokémon, Magic: The Gathering, and Yu-Gi-Oh! and add results to your Have/Want lists. All three search the real, complete live card databases (see **Live card search**).
 - **Matches** — a ranked list of other collectors, computed server-side. 🤝 "Perfect trade match" badges mean a trade needs no cash or shipping either way. Tap a match to see exactly which cards would change hands, then send a trade proposal.
 - **Trades** — respond to (accept/decline) proposals you've received, and confirm proposals you've sent once the swap actually happens. See **Trades & verification** below.
-- **Profile** — update your avatar/ZIP, or log out.
+- **Profile** — update your avatar/ZIP/search radius, or log out.
 
 ## Accounts & auth
 
@@ -40,7 +40,11 @@ There's no "cancel" or "undo" — this is a deliberate MVP scope cut. If a trade
 
 Matching happens in `worker/src/routes/matches.js`: for each other account, it finds the overlap between their Haves and your Wants (and vice versa) using `game + lowercased name` as the identity key — not a shared card id, since cards can come from three different live APIs with no common id scheme.
 
-Proximity is ZIP-code-based, not real geolocation: same ZIP ("Same ZIP code"), same first-3-digits ("Nearby (same area)"), or unranked. This is a deliberate simplification — no location-permission prompt, no need to store precise coordinates, and no dependency on a geocoding service — at the cost of being coarse (two ZIPs sharing a prefix can still be many miles apart in low-density areas). A real geodistance upgrade would mean adding a ZIP-centroid lookup or a geocoding API call at signup.
+**Real distance, when available.** On account creation and whenever a ZIP changes, the Worker geocodes it via [Zippopotam.us](https://www.zippopotam.us/) (free, keyless, server-side — same "free API, no key" pattern as the card search providers) and stores the ZIP centroid's `lat`/`lng`. When both sides of a potential match have coordinates, `worker/src/utils.js`'s `haversineMiles` computes real great-circle distance in miles, shown as e.g. "12.7 mi away". This is still centroid-based, not precise geolocation — no location-permission prompt, no device coordinates ever collected — so it's accurate to "which ZIP", not to the exact address.
+
+**Search radius.** Profile has a "Search radius" setting (5/10/25/50/100/250 miles, or "Any distance" — the default). It's applied server-side in `getMatches`: a collector farther than your radius is dropped from *your* matches list (radius is per-viewer, not mutual — it never affects what you look like in anyone else's results). **A match is only ever filtered out when its distance is actually known.** If geocoding failed for either account (bad ZIP, Zippopotam down, no ZIP entered at all), that match's distance is `null` and it's always shown, radius setting or not — an infrastructure hiccup should never silently hide a legitimate match. Only a normal browser deploy's Worker has been used to test the actual Zippopotam call, since this sandbox blocks arbitrary outbound domains the same way it does for the card-search APIs (see **What's been verified vs. what hasn't**) — the surrounding filter/sort/graceful-degradation logic itself was fully verified locally by seeding known coordinates directly into D1 and exercising every path (in-radius, out-of-radius, radius removed, ZIP unchanged preserves coordinates, ZIP changed triggers re-geocode and nulls stale coordinates on failure) against the real Worker code.
+
+**Fallback.** When distance can't be computed, the old ZIP-prefix bucketing still runs as a label: same ZIP ("Same ZIP code"), same first-3-digits ("Nearby (same area)"), or nothing. `distanceMiles` (when present) always takes priority over this in both sorting and display — see `src/utils/distance.js`.
 
 ## Live card search
 
@@ -58,9 +62,9 @@ If a live API is unreachable, the picker shows a warning and falls back to a sma
 
 ## What's been verified vs. what hasn't
 
-- **Verified end-to-end, locally, against the real backend code:** account creation, auth, adding/removing collection items, server-side matching (including the mutual-match and proximity logic), the full trade lifecycle (propose → accept/decline → mutual confirm → completed, including idempotent re-proposing, idempotent re-confirming, and every authorization guard — only the recipient can accept/decline, only participants can confirm, only an accepted trade can be confirmed), profile updates, and session persistence across a page reload — all driven through the actual UI (or, for the trade-lifecycle authorization edge cases, directly against the Worker API) against Wrangler running locally with D1's local emulation.
+- **Verified end-to-end, locally, against the real backend code:** account creation, auth, adding/removing collection items, server-side matching (including the mutual-match and proximity logic), distance-based matching (radius filtering that only ever excludes a match with a *known* out-of-radius distance, real-distance math cross-checked against known reference distances, ZIP-unchanged preserving stored coordinates vs. ZIP-changed correctly triggering re-geocode and nulling stale coordinates on failure), the full trade lifecycle (propose → accept/decline → mutual confirm → completed, including idempotent re-proposing, idempotent re-confirming, and every authorization guard — only the recipient can accept/decline, only participants can confirm, only an accepted trade can be confirmed), profile updates, and session persistence across a page reload — all driven through the actual UI (or, for the trade-lifecycle authorization edge cases and distance filtering, directly against the Worker API, seeding known coordinates straight into D1 since this sandbox can't reach the geocoding API itself) against Wrangler running locally with D1's local emulation.
 - **Verified in production:** both Workers are deployed and live — the API at `https://swapdeck-api.cwinchester636.workers.dev` (bound to the real `swapdeck` D1 database, 3 seed accounts already in it) and the frontend at its custom domain, `https://swapdeck.cards` (built with `VITE_API_BASE_URL` pointing at that same API). Confirmed via the Cloudflare API (`workers_get_worker` for both `swapdeck-api` and `swapdeck`) and successful GitHub Actions runs, including the custom-domain route itself (Action log: `Deployed swapdeck triggers ... swapdeck.cards (custom domain)`) — this sandbox's own network policy blocks outbound requests to both `workers.dev` and `swapdeck.cards`, so a direct `curl` from here isn't possible, but every deploy is real and independently confirmed on Cloudflare's side.
-- **Not yet verified:** the three live card-search APIs against the real internet (see **Live card search** above) — same sandbox network restriction, so only their error-fallback path has been exercised for real. Worth a smoke test from a normal browser.
+- **Not yet verified:** the three live card-search APIs, and the Zippopotam.us ZIP-geocoding call, against the real internet (see **Live card search** and **Matching & proximity** above) — same sandbox network restriction, so only their error-fallback paths have been exercised for real. Worth confirming a fresh signup with a real ZIP actually gets coordinates (check `radiusMiles` filtering has a visible effect) once this is live.
 
 ## Deploying
 
@@ -119,6 +123,7 @@ npm run dev              # wrangler dev on :8787
 - `src/hooks/useCardSearch.js` — debounces a query, merges curated + live results, exposes loading/error state.
 - `src/hooks/useLocalStorage.js` — persists the auth token on-device.
 - `src/utils/rarity.js` — maps each live API's rarity vocabulary onto the app's 5-bucket scale.
+- `src/utils/distance.js` — formats a match's distance label, preferring real `distanceMiles` over the ZIP-prefix fallback.
 - `src/components/` — `Onboarding`, `BottomNav`, `HomeView`, `CollectionView`, `CardPicker`, `CardChip`, `MatchesView`, `TradesView`, `ProfileView`, `AvatarPicker`, `AvatarIcon`.
 - `src/App.jsx` — auth/session orchestration, data fetching, tab navigation.
 
@@ -127,11 +132,12 @@ npm run dev              # wrangler dev on :8787
 - `.env` — `VITE_API_BASE_URL`, checked in since it's not a secret.
 
 **Backend (`worker/`)**
-- `worker/migrations/` — D1 schema, applied via Wrangler's tracked migrations system (`0001_initial_schema.sql` — `accounts`, `collection_items`, `trade_proposals`; `0002_trade_confirmations.sql` — adds mutual trade-completion tracking).
+- `worker/migrations/` — D1 schema, applied via Wrangler's tracked migrations system (`0001_initial_schema.sql` — `accounts`, `collection_items`, `trade_proposals`; `0002_trade_confirmations.sql` — mutual trade-completion tracking; `0003_geolocation.sql` — `lat`/`lng`/`radius_miles` on `accounts`).
 - `worker/src/index.js` — router.
 - `worker/src/auth.js` — bearer-token authentication.
 - `worker/src/routes/` — `accounts.js`, `collection.js`, `matches.js`, `trades.js`.
-- `worker/src/utils.js` — JSON/CORS response helpers, token generation/hashing, ZIP proximity.
+- `worker/src/geocode.js` — ZIP → lat/lng via Zippopotam.us, timeout-guarded, never throws.
+- `worker/src/utils.js` — JSON/CORS response helpers, token generation/hashing, ZIP proximity, haversine distance.
 - `worker/wrangler.toml` — Worker config, including the real D1 database binding.
 
 **CI**

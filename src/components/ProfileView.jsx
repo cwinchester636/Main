@@ -2,21 +2,25 @@ import { useState } from 'react'
 import AvatarPicker from './AvatarPicker.jsx'
 import { ApiError } from '../api/client.js'
 
+const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250]
+
 export default function ProfileView({ account, onUpdate, onLogOut }) {
   const [avatar, setAvatar] = useState(account.avatar)
   const [zip, setZip] = useState(account.zip || '')
+  const [radiusMiles, setRadiusMiles] = useState(account.radiusMiles ?? null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
-  const dirty = avatar !== account.avatar || zip !== (account.zip || '')
+  const dirty =
+    avatar !== account.avatar || zip !== (account.zip || '') || radiusMiles !== (account.radiusMiles ?? null)
 
   const save = async () => {
     setSaving(true)
     setError('')
     setSaved(false)
     try {
-      await onUpdate({ avatar, zip })
+      await onUpdate({ avatar, zip, radiusMiles })
       setSaved(true)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not save changes.')
@@ -39,6 +43,23 @@ export default function ProfileView({ account, onUpdate, onLogOut }) {
         onChange={(e) => setZip(e.target.value)}
         placeholder="Used only to show how close a match is"
       />
+
+      <label className="field-label" htmlFor="profile-radius">Search radius</label>
+      <select
+        id="profile-radius"
+        className="text-input"
+        value={radiusMiles ?? 'any'}
+        onChange={(e) => setRadiusMiles(e.target.value === 'any' ? null : Number(e.target.value))}
+      >
+        <option value="any">Any distance</option>
+        {RADIUS_OPTIONS.map((mi) => (
+          <option key={mi} value={mi}>Within {mi} miles</option>
+        ))}
+      </select>
+      <p className="section-hint">
+        Only affects your own Matches list — collectors farther than this won't show up for you. Needs a ZIP code
+        above to take effect; matches with no known distance are always shown.
+      </p>
 
       <p className="field-label">Avatar</p>
       <AvatarPicker value={avatar} onChange={setAvatar} />
