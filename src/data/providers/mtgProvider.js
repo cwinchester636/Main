@@ -27,3 +27,12 @@ export async function searchMtgCards(query, { signal } = {}) {
   if (json.object === 'error') return [] // e.g. 404 "no matching cards" — not a failure
   return (json.data ?? []).map(normalizeMtgCard)
 }
+
+export async function fetchMtgPrice(rawId, { signal } = {}) {
+  const json = await fetchJson(`https://api.scryfall.com/cards/${encodeURIComponent(rawId)}`, { signal })
+  if (json.object === 'error') return null
+
+  const usd = json.prices?.usd ?? json.prices?.usd_foil
+  if (!usd) return null
+  return { amount: parseFloat(usd), currency: 'USD' }
+}

@@ -3,6 +3,7 @@ import { json, matchKey, zipProximity, haversineMiles } from '../utils.js'
 function serializeCard(row) {
   return {
     id: row.id,
+    sourceId: row.source_id ?? null,
     name: row.name,
     game: row.game,
     set: row.set_name,

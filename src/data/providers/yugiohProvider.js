@@ -24,3 +24,13 @@ export async function searchYugiohCards(query, { signal } = {}) {
   if (json.error) return [] // "No card matching your query was found" — not a failure
   return (json.data ?? []).map(normalizeYugiohCard)
 }
+
+export async function fetchYugiohPrice(rawId, { signal } = {}) {
+  const json = await fetchJson(`${BASE_URL}?id=${encodeURIComponent(rawId)}`, { signal })
+  if (json.error) return null
+
+  const prices = json.data?.[0]?.card_prices?.[0]
+  const amount = parseFloat(prices?.tcgplayer_price ?? prices?.cardmarket_price)
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  return { amount, currency: 'USD' }
+}

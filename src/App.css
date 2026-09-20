@@ -424,6 +424,11 @@
   text-overflow: ellipsis;
 }
 
+.card-chip-price {
+  color: var(--success);
+  font-weight: 600;
+}
+
 .card-chip-remove {
   border: none;
   background: none;

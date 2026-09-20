@@ -1,10 +1,20 @@
 import { useState } from 'react'
 import { GAMES } from '../data/cards.js'
+import { useCardPrice } from '../hooks/useCardPrice.js'
 
 const gameEmoji = (gameId) => GAMES.find((g) => g.id === gameId)?.emoji ?? '🃏'
 
+const formatPrice = (amount) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
+
 export default function CardChip({ card, onRemove, compact = false }) {
   const [imageFailed, setImageFailed] = useState(false)
+  // Once a card is saved server-side, `id` becomes the collection row's own
+  // (stable, needed for removal) id — `sourceId` is the original live-search
+  // id a price lookup actually needs. Falls back to `id` for cards that
+  // haven't round-tripped through the backend yet (e.g. a fresh search
+  // result), where it's still the live id itself.
+  const price = useCardPrice(card.sourceId ?? card.id)
 
   return (
     <div className={`card-chip rarity-${card.rarity}${compact ? ' compact' : ''}`}>
@@ -20,7 +30,10 @@ export default function CardChip({ card, onRemove, compact = false }) {
       )}
       <span className="card-chip-text">
         <span className="card-chip-name">{card.name}</span>
-        <span className="card-chip-set">{card.set} · {card.number}</span>
+        <span className="card-chip-set">
+          {card.set} · {card.number}
+          {price && <span className="card-chip-price"> · {formatPrice(price.amount)}</span>}
+        </span>
       </span>
       {onRemove && (
         <button

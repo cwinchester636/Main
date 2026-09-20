@@ -3,6 +3,7 @@ import { error, json, newId } from '../utils.js'
 function serializeCard(row) {
   return {
     id: row.id,
+    sourceId: row.source_id ?? null,
     name: row.name,
     game: row.game,
     set: row.set_name,
@@ -33,9 +34,10 @@ export async function addCollectionItem(request, env, account) {
   }
 
   const id = newId()
+  const sourceId = typeof card.id === 'string' ? card.id : null
   await env.DB.prepare(
-    `INSERT INTO collection_items (id, account_id, list_type, game, name, set_name, number, rarity, image, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO collection_items (id, account_id, list_type, game, name, set_name, number, rarity, image, source_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -47,11 +49,12 @@ export async function addCollectionItem(request, env, account) {
       card.number ?? null,
       card.rarity ?? null,
       card.image ?? null,
+      sourceId,
       Date.now(),
     )
     .run()
 
-  return json({ item: serializeCard({ id, ...card, set_name: card.set }) }, 201)
+  return json({ item: serializeCard({ ...card, id, set_name: card.set, source_id: sourceId }) }, 201)
 }
 
 export async function deleteCollectionItem(env, account, itemId) {
