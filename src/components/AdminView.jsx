@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import AvatarIcon from './AvatarIcon.jsx'
 import CardChip from './CardChip.jsx'
+import PhotoViewerModal from './PhotoViewerModal.jsx'
 import { api, ApiError } from '../api/client.js'
 
 function formatDate(ts) {
@@ -90,8 +91,10 @@ function AdminUsers({ token, currentAccountId }) {
   )
 }
 
-function AdminTradeCard({ trade }) {
+function AdminTradeCard({ trade, token }) {
   const { status } = trade
+  const [viewingPhotoId, setViewingPhotoId] = useState(null)
+
   return (
     <div className={`trade-card admin-trade-card trade-${status}`}>
       <div className="trade-card-header">
@@ -119,8 +122,8 @@ function AdminTradeCard({ trade }) {
             <div className="match-detail-col">
               <h3>{trade.from.username} offered</h3>
               <div className="card-chip-list">
-                {trade.fromOffered.map((card, i) => (
-                  <CardChip key={i} card={card} compact />
+                {trade.fromOffered.map((card) => (
+                  <CardChip key={card.id} card={card} compact onViewPhoto={setViewingPhotoId} />
                 ))}
               </div>
             </div>
@@ -129,8 +132,8 @@ function AdminTradeCard({ trade }) {
             <div className="match-detail-col">
               <h3>{trade.to.username} offered</h3>
               <div className="card-chip-list">
-                {trade.toOffered.map((card, i) => (
-                  <CardChip key={i} card={card} compact />
+                {trade.toOffered.map((card) => (
+                  <CardChip key={card.id} card={card} compact onViewPhoto={setViewingPhotoId} />
                 ))}
               </div>
             </div>
@@ -138,6 +141,15 @@ function AdminTradeCard({ trade }) {
         </div>
       ) : (
         <p className="trade-hint">No overlapping cards were recorded at the time this was proposed.</p>
+      )}
+
+      {viewingPhotoId && (
+        <PhotoViewerModal
+          token={token}
+          itemId={viewingPhotoId}
+          fetcher={api.adminFetchTradePhoto}
+          onClose={() => setViewingPhotoId(null)}
+        />
       )}
     </div>
   )
@@ -167,7 +179,7 @@ function AdminTrades({ token }) {
       {trades && trades.length > 0 && (
         <div className="trade-list">
           {trades.map((trade) => (
-            <AdminTradeCard key={trade.id} trade={trade} />
+            <AdminTradeCard key={trade.id} trade={trade} token={token} />
           ))}
         </div>
       )}

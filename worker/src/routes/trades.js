@@ -39,11 +39,27 @@ async function computeOfferedCards(env, fromAccountId, toAccountId) {
   }
 }
 
-function snapshotInsert(env, tradeId, ownerAccountId, row, createdAt) {
+// A verification photo has to become an independent copy at propose time,
+// not a reference to the live collection_item's KV key — that key gets
+// deleted the moment the owner removes the item from their collection
+// (see deleteCollectionItem), which would silently break a trade record
+// that's supposed to survive exactly that. Costs one extra KV read+write
+// per photographed card offered, only at propose time.
+async function copySnapshotPhoto(env, sourcePhotoKey) {
+  if (!sourcePhotoKey) return null
+  const object = await env.PHOTOS.getWithMetadata(sourcePhotoKey, 'arrayBuffer')
+  if (!object?.value) return null
+
+  const snapshotKey = `snapshot/${newId()}`
+  await env.PHOTOS.put(snapshotKey, object.value, { metadata: object.metadata })
+  return snapshotKey
+}
+
+function snapshotInsert(env, tradeId, ownerAccountId, row, snapshotPhotoKey, createdAt) {
   return env.DB.prepare(
     `INSERT INTO trade_snapshot_items
-       (id, trade_id, owner_account_id, game, name, set_name, number, rarity, image, condition, grade, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, trade_id, owner_account_id, game, name, set_name, number, rarity, image, condition, grade, photo_key, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     newId(),
     tradeId,
@@ -56,6 +72,7 @@ function snapshotInsert(env, tradeId, ownerAccountId, row, createdAt) {
     row.image,
     row.condition,
     row.grade,
+    snapshotPhotoKey,
     createdAt,
   )
 }
@@ -80,13 +97,16 @@ export async function proposeTrade(request, env, account) {
   const createdAt = Date.now()
   const { fromOffers, toOffers } = await computeOfferedCards(env, account.id, body.toAccountId)
 
+  const fromPhotoKeys = await Promise.all(fromOffers.map((row) => copySnapshotPhoto(env, row.photo_key)))
+  const toPhotoKeys = await Promise.all(toOffers.map((row) => copySnapshotPhoto(env, row.photo_key)))
+
   await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO trade_proposals (id, from_account_id, to_account_id, status, created_at)
        VALUES (?, ?, ?, 'pending', ?)`,
     ).bind(id, account.id, body.toAccountId, createdAt),
-    ...fromOffers.map((row) => snapshotInsert(env, id, account.id, row, createdAt)),
-    ...toOffers.map((row) => snapshotInsert(env, id, body.toAccountId, row, createdAt)),
+    ...fromOffers.map((row, i) => snapshotInsert(env, id, account.id, row, fromPhotoKeys[i], createdAt)),
+    ...toOffers.map((row, i) => snapshotInsert(env, id, body.toAccountId, row, toPhotoKeys[i], createdAt)),
   ])
 
   return json({ proposal: { id, from_account_id: account.id, to_account_id: body.toAccountId, status: 'pending', created_at: createdAt } }, 201)

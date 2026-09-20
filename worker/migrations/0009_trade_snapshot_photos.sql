@@ -1,0 +1,12 @@
+-- Carries a card's verification photo into its trade snapshot, same as
+-- every other field trade_snapshot_items already copies at propose time
+-- (see migrations/0007_trade_snapshots.sql) -- without this, an admin
+-- reviewing a trade dispute could see the card's name/condition/grade but
+-- not the one piece of evidence the whole feature exists for. This is its
+-- own independent KV key, not the same one collection_items.photo_key
+-- points at (migrations/0008) -- worker/src/routes/trades.js copies the
+-- actual bytes into a new key at propose time. A shared key was tried
+-- first and rejected: deleteCollectionItem deletes its KV entry the
+-- moment the owner removes the item from their live collection, which
+-- would silently break the trade record's photo along with it.
+ALTER TABLE trade_snapshot_items ADD COLUMN photo_key TEXT;

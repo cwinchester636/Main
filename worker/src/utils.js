@@ -83,6 +83,25 @@ export function matchKey(game, name) {
   return `${game}::${name.trim().toLowerCase()}`
 }
 
+// Shared by every route that serves a verification photo (a live
+// collection item, or a trade's snapshot copy) once that route has
+// already decided the requester is allowed to see it — this only handles
+// the KV read and Response shape, never the authorization itself.
+export async function servePhoto(env, photoKey) {
+  if (!photoKey) return error('not found', 404)
+
+  const object = await env.PHOTOS.getWithMetadata(photoKey, 'arrayBuffer')
+  if (!object?.value) return error('photo not found', 404)
+
+  return new Response(object.value, {
+    headers: {
+      'Content-Type': object.metadata?.contentType || 'image/jpeg',
+      'Cache-Control': 'private, max-age=3600',
+      ...CORS_HEADERS,
+    },
+  })
+}
+
 // Coarse, privacy-friendly proximity: no real geodistance, just how much of
 // the zip code matches. 0 = same zip, 1 = same 3-digit prefix (same region),
 // 2 = unknown or no overlap. Used as a fallback label when one or both

@@ -1,4 +1,4 @@
-import { error, json } from '../utils.js'
+import { error, json, servePhoto } from '../utils.js'
 import { isAdminUsername } from '../admin.js'
 import { deriveStatus, completedAt } from './trades.js'
 
@@ -8,6 +8,7 @@ export function requireAdmin(account, env) {
 
 function serializeSnapshotCard(row) {
   return {
+    id: row.id,
     name: row.name,
     game: row.game,
     set: row.set_name,
@@ -16,6 +17,7 @@ function serializeSnapshotCard(row) {
     image: row.image,
     condition: row.condition ?? null,
     grade: row.grade ?? null,
+    hasPhoto: !!row.photo_key,
   }
 }
 
@@ -121,4 +123,19 @@ export async function listTrades(env) {
       }
     }),
   })
+}
+
+// The verification photo for one card in a trade snapshot, keyed by the
+// snapshot row's own id (not the original collection_item's — that item
+// may have been edited or deleted since, but the snapshot's copy of the
+// KV key still resolves, same as every other field it copied at propose
+// time). Admin-only: requireAdmin already gates the route this hangs off
+// of in index.js, same as the rest of the Admin Trades view.
+export async function getTradeSnapshotPhoto(env, snapshotItemId) {
+  const row = await env.DB.prepare('SELECT photo_key FROM trade_snapshot_items WHERE id = ?')
+    .bind(snapshotItemId)
+    .first()
+  if (!row) return error('not found', 404)
+
+  return servePhoto(env, row.photo_key)
 }

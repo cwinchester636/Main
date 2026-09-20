@@ -1,4 +1,4 @@
-import { error, json, newId, matchKey, CORS_HEADERS } from '../utils.js'
+import { error, json, newId, matchKey, servePhoto } from '../utils.js'
 import { isAdminUsername } from '../admin.js'
 
 // Kept in sync with src/data/conditions.js (the frontend can't import
@@ -171,14 +171,5 @@ export async function getCollectionItemPhoto(env, account, itemId) {
     if (!isMatchedPartner) return error('not authorized to view this photo', 403)
   }
 
-  const object = await env.PHOTOS.getWithMetadata(item.photo_key, 'arrayBuffer')
-  if (!object?.value) return error('photo not found', 404)
-
-  return new Response(object.value, {
-    headers: {
-      'Content-Type': object.metadata?.contentType || 'image/jpeg',
-      'Cache-Control': 'private, max-age=3600',
-      ...CORS_HEADERS,
-    },
-  })
+  return servePhoto(env, item.photo_key)
 }

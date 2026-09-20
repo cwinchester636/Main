@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../api/client.js'
 
-export default function PhotoViewerModal({ token, itemId, onClose }) {
+// fetcher defaults to a user's own/matched collection-item photos;
+// AdminView passes api.adminFetchTradePhoto to view a trade snapshot's
+// copy instead — same viewer, different source endpoint.
+export default function PhotoViewerModal({ token, itemId, onClose, fetcher = api.fetchCollectionItemPhoto }) {
   const [status, setStatus] = useState('loading') // loading | ready | error
   const [errorMessage, setErrorMessage] = useState('')
   const [url, setUrl] = useState(null)
@@ -10,8 +13,7 @@ export default function PhotoViewerModal({ token, itemId, onClose }) {
     let cancelled = false
     let objectUrl = null
 
-    api
-      .fetchCollectionItemPhoto(token, itemId)
+    fetcher(token, itemId)
       .then((blob) => {
         if (cancelled) return
         objectUrl = URL.createObjectURL(blob)
@@ -28,7 +30,7 @@ export default function PhotoViewerModal({ token, itemId, onClose }) {
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [token, itemId])
+  }, [token, itemId, fetcher])
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>

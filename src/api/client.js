@@ -79,4 +79,5 @@ export const api = {
   adminListUsers: (token) => request('/api/admin/users', { token }),
   adminDeleteUser: (token, userId) => request(`/api/admin/users/${userId}`, { method: 'DELETE', token }),
   adminListTrades: (token) => request('/api/admin/trades', { token }),
+  adminFetchTradePhoto: (token, snapshotItemId) => fetchBlob(`/api/admin/trade-photos/${snapshotItemId}`, token),
 }
