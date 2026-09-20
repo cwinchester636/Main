@@ -14,4 +14,4 @@ migrations_dir = "migrations"
 # git, not a runtime-settable value — so changing it always goes through a
 # real code review + deploy, never a silent database write. See
 # worker/src/admin.js.
-ADMIN_USERNAMES = ""
+ADMIN_USERNAMES = "cwinchester636"
