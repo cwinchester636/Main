@@ -2,6 +2,8 @@ import { useState } from 'react'
 import AvatarIcon from './AvatarIcon.jsx'
 import ValueDisparityModal from './ValueDisparityModal.jsx'
 import CashInput from './CashInput.jsx'
+import TradeChatModal from './TradeChatModal.jsx'
+import ReportTradeModal from './ReportTradeModal.jsx'
 import { checkValueDisparity } from '../utils/tradeValue.js'
 import { formatUSD } from '../utils/currency.js'
 
@@ -16,11 +18,14 @@ function formatDate(ts) {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function TradeCard({ trade, direction, match, onRespond, onConfirm }) {
+function TradeCard({ trade, direction, match, onRespond, onConfirm, token, currentAccountId }) {
   const { counterparty, status } = trade
   const [checkingValue, setCheckingValue] = useState(false)
   const [disparity, setDisparity] = useState(null)
   const [cashInput, setCashInput] = useState('')
+  const [chatOpen, setChatOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportSubmitted, setReportSubmitted] = useState(false)
   const cashAmount = Number(cashInput) || 0
 
   const handleAcceptClick = async () => {
@@ -92,6 +97,38 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm }) {
         </p>
       )}
 
+      <div className="trade-footer-actions">
+        <button type="button" className="link-button" onClick={() => setChatOpen(true)}>💬 Chat</button>
+        <button type="button" className="link-button danger" onClick={() => setReportOpen(true)}>
+          ⚠️ Report an issue
+        </button>
+      </div>
+
+      {reportSubmitted && (
+        <p className="trade-hint trade-hint-success">Report submitted — a SwapDeck admin will review it.</p>
+      )}
+
+      {chatOpen && (
+        <TradeChatModal
+          token={token}
+          tradeId={trade.id}
+          currentAccountId={currentAccountId}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
+
+      {reportOpen && (
+        <ReportTradeModal
+          token={token}
+          tradeId={trade.id}
+          onClose={() => setReportOpen(false)}
+          onSubmitted={() => {
+            setReportOpen(false)
+            setReportSubmitted(true)
+          }}
+        />
+      )}
+
       {disparity && (
         <ValueDisparityModal
           theirLabel={`${counterparty.username}'s cards`}
@@ -112,7 +149,7 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm }) {
   )
 }
 
-export default function TradesView({ trades, matches, onRespond, onConfirm }) {
+export default function TradesView({ trades, matches, onRespond, onConfirm, token, currentAccountId }) {
   const { sent, received } = trades
   const hasAny = sent.length > 0 || received.length > 0
   const matchByAccountId = (accountId) => matches.find((m) => m.account.id === accountId)
@@ -146,6 +183,8 @@ export default function TradesView({ trades, matches, onRespond, onConfirm }) {
                 match={matchByAccountId(trade.counterparty.id)}
                 onRespond={onRespond}
                 onConfirm={onConfirm}
+                token={token}
+                currentAccountId={currentAccountId}
               />
             ))}
           </div>
@@ -164,6 +203,8 @@ export default function TradesView({ trades, matches, onRespond, onConfirm }) {
                 match={matchByAccountId(trade.counterparty.id)}
                 onRespond={onRespond}
                 onConfirm={onConfirm}
+                token={token}
+                currentAccountId={currentAccountId}
               />
             ))}
           </div>

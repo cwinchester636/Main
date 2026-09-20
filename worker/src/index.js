@@ -5,6 +5,8 @@ import { getCollection, addCollectionItem, deleteCollectionItem, getCollectionIt
 import { getMatches } from './routes/matches.js'
 import { proposeTrade, getTrades, respondToTrade, confirmTrade } from './routes/trades.js'
 import { requireAdmin, listUsers, deleteUser, listTrades, getTradeSnapshotPhoto } from './routes/admin.js'
+import { getMessages, sendMessage } from './routes/messages.js'
+import { createReport, adminListReports, adminResolveReport } from './routes/reports.js'
 
 export default {
   async fetch(request, env) {
@@ -56,6 +58,18 @@ export default {
         return await confirmTrade(env, account, confirmMatch[1])
       }
 
+      const messagesMatch = path.match(/^\/api\/trades\/([^/]+)\/messages$/)
+      if (messagesMatch && request.method === 'GET') {
+        return await getMessages(env, account, messagesMatch[1])
+      }
+      if (messagesMatch && request.method === 'POST') {
+        return await sendMessage(request, env, account, messagesMatch[1])
+      }
+      const reportMatch = path.match(/^\/api\/trades\/([^/]+)\/report$/)
+      if (reportMatch && request.method === 'POST') {
+        return await createReport(request, env, account, reportMatch[1])
+      }
+
       if (path === '/api/admin/users' && request.method === 'GET') {
         return requireAdmin(account, env) ?? (await listUsers(env))
       }
@@ -69,6 +83,13 @@ export default {
       const adminPhotoMatch = path.match(/^\/api\/admin\/trade-photos\/([^/]+)$/)
       if (adminPhotoMatch && request.method === 'GET') {
         return requireAdmin(account, env) ?? (await getTradeSnapshotPhoto(env, adminPhotoMatch[1]))
+      }
+      if (path === '/api/admin/reports' && request.method === 'GET') {
+        return requireAdmin(account, env) ?? (await adminListReports(env))
+      }
+      const adminReportMatch = path.match(/^\/api\/admin\/reports\/([^/]+)$/)
+      if (adminReportMatch && request.method === 'PATCH') {
+        return requireAdmin(account, env) ?? (await adminResolveReport(env, adminReportMatch[1]))
       }
 
       return error('not found', 404)

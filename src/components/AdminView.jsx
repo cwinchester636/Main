@@ -2,12 +2,26 @@ import { useEffect, useState } from 'react'
 import AvatarIcon from './AvatarIcon.jsx'
 import CardChip from './CardChip.jsx'
 import PhotoViewerModal from './PhotoViewerModal.jsx'
+import TradeChatModal from './TradeChatModal.jsx'
 import { api, ApiError } from '../api/client.js'
 import { formatUSD } from '../utils/currency.js'
 
 function formatDate(ts) {
   if (!ts) return null
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatDateTime(ts) {
+  if (!ts) return null
+  return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+const REPORT_REASON_LABEL = {
+  not_received: 'Never received the card',
+  not_as_described: 'Card not as described',
+  no_show: "Other person didn't show/respond",
+  payment_dispute: "Cash wasn't paid as agreed",
+  other: 'Something else',
 }
 
 const TRADE_STATUS_LABEL = {
@@ -196,6 +210,114 @@ function AdminTrades({ token }) {
   )
 }
 
+function AdminReportCard({ report, token, onResolved }) {
+  const [viewingChat, setViewingChat] = useState(false)
+  const [resolving, setResolving] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleResolve = async () => {
+    setResolving(true)
+    setError('')
+    try {
+      await api.adminResolveReport(token, report.id)
+      onResolved(report.id)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not resolve this report.')
+      setResolving(false)
+    }
+  }
+
+  return (
+    <div className={`trade-card admin-report-card report-${report.status}`}>
+      <div className="trade-card-header">
+        <span className="trade-summary-text">
+          <strong>{report.trade.fromUsername} ↔ {report.trade.toUsername}</strong>
+          <span className={`trade-status-badge status-${report.status === 'open' ? 'declined' : 'completed'}`}>
+            {report.status === 'open' ? 'Open' : 'Resolved'}
+          </span>
+        </span>
+      </div>
+
+      <p className="section-hint">
+        Reported by {report.reporter.username} ({report.reporter.email || 'no email'}) · {formatDateTime(report.createdAt)}
+      </p>
+      <p className="report-reason">{REPORT_REASON_LABEL[report.reason] ?? report.reason}</p>
+      {report.description && <p className="report-description">{report.description}</p>}
+      {report.lat != null && report.lng != null && (
+        <p className="section-hint">
+          📍{' '}
+          <a
+            href={`https://www.google.com/maps?q=${report.lat},${report.lng}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {report.lat.toFixed(5)}, {report.lng.toFixed(5)}
+          </a>
+          {report.accuracyMeters != null ? ` (±${Math.round(report.accuracyMeters)}m)` : ''}
+        </p>
+      )}
+      {report.status === 'resolved' && report.resolvedAt && (
+        <p className="section-hint">Resolved {formatDateTime(report.resolvedAt)}</p>
+      )}
+
+      {error && <p className="form-error">{error}</p>}
+
+      <div className="trade-actions">
+        <button type="button" className="button secondary" onClick={() => setViewingChat(true)}>
+          💬 View chat log
+        </button>
+        {report.status === 'open' && (
+          <button type="button" className="button primary" disabled={resolving} onClick={handleResolve}>
+            {resolving ? 'Resolving…' : 'Mark resolved'}
+          </button>
+        )}
+      </div>
+
+      {viewingChat && (
+        <TradeChatModal token={token} tradeId={report.tradeId} readOnly onClose={() => setViewingChat(false)} />
+      )}
+    </div>
+  )
+}
+
+function AdminReports({ token }) {
+  const [reports, setReports] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    api
+      .adminListReports(token)
+      .then(({ reports: list }) => setReports(list))
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not load reports.'))
+  }, [token])
+
+  const handleResolved = (reportId) => {
+    setReports((prev) => prev.map((r) => (r.id === reportId ? { ...r, status: 'resolved', resolvedAt: Date.now() } : r)))
+  }
+
+  const openCount = reports?.filter((r) => r.status === 'open').length ?? 0
+
+  return (
+    <>
+      <p className="view-subtitle">
+        {reports ? `${openCount} open report${openCount === 1 ? '' : 's'} (${reports.length} total).` : 'Loading…'}
+      </p>
+
+      {error && <p className="form-error">{error}</p>}
+
+      {reports && reports.length === 0 && <p className="trade-hint">No reports filed yet.</p>}
+
+      {reports && reports.length > 0 && (
+        <div className="trade-list">
+          {reports.map((report) => (
+            <AdminReportCard key={report.id} report={report} token={token} onResolved={handleResolved} />
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function AdminView({ token, currentAccountId }) {
   const [section, setSection] = useState('users')
 
@@ -217,13 +339,18 @@ export default function AdminView({ token, currentAccountId }) {
         >
           Trades
         </button>
+        <button
+          type="button"
+          className={`admin-subtab${section === 'reports' ? ' active' : ''}`}
+          onClick={() => setSection('reports')}
+        >
+          Reports
+        </button>
       </div>
 
-      {section === 'users' ? (
-        <AdminUsers token={token} currentAccountId={currentAccountId} />
-      ) : (
-        <AdminTrades token={token} />
-      )}
+      {section === 'users' && <AdminUsers token={token} currentAccountId={currentAccountId} />}
+      {section === 'trades' && <AdminTrades token={token} />}
+      {section === 'reports' && <AdminReports token={token} />}
     </div>
   )
 }

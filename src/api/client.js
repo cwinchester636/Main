@@ -76,8 +76,17 @@ export const api = {
   confirmTrade: (token, tradeId) =>
     request(`/api/trades/${tradeId}/confirm`, { method: 'POST', token }),
 
+  getTradeMessages: (token, tradeId) => request(`/api/trades/${tradeId}/messages`, { token }),
+  sendTradeMessage: (token, tradeId, body) =>
+    request(`/api/trades/${tradeId}/messages`, { method: 'POST', token, body: { body } }),
+  reportTrade: (token, tradeId, report) =>
+    request(`/api/trades/${tradeId}/report`, { method: 'POST', token, body: report }),
+
   adminListUsers: (token) => request('/api/admin/users', { token }),
   adminDeleteUser: (token, userId) => request(`/api/admin/users/${userId}`, { method: 'DELETE', token }),
   adminListTrades: (token) => request('/api/admin/trades', { token }),
   adminFetchTradePhoto: (token, snapshotItemId) => fetchBlob(`/api/admin/trade-photos/${snapshotItemId}`, token),
+  adminListReports: (token) => request('/api/admin/reports', { token }),
+  adminResolveReport: (token, reportId) =>
+    request(`/api/admin/reports/${reportId}`, { method: 'PATCH', token }),
 }

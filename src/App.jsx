@@ -150,7 +150,14 @@ export default function App() {
             />
           )}
           {tab === 'trades' && (
-            <TradesView trades={trades} matches={matches} onRespond={respondToTrade} onConfirm={confirmTrade} />
+            <TradesView
+              trades={trades}
+              matches={matches}
+              onRespond={respondToTrade}
+              onConfirm={confirmTrade}
+              token={token}
+              currentAccountId={account.id}
+            />
           )}
           {tab === 'admin' && account.isAdmin && (
             <AdminView token={token} currentAccountId={account.id} />
