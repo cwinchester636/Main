@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { GAMES } from '../data/cards.js'
 import { CONDITIONS, MIN_GRADE, MAX_GRADE } from '../data/conditions.js'
 import { useCardSearch } from '../hooks/useCardSearch.js'
+import CardMeta from './CardMeta.jsx'
 
 function ConditionStep({ card, onConfirm, onBack }) {
   const [condition, setCondition] = useState('NM')
@@ -19,7 +20,7 @@ function ConditionStep({ card, onConfirm, onBack }) {
         {card.image ? <img className="picker-row-image" src={card.image} alt="" /> : null}
         <span className="picker-row-text">
           <span className="picker-row-name">{card.name}</span>
-          <span className="picker-row-set">{card.set} · {card.number}</span>
+          <CardMeta card={card} className="picker-row-set" />
         </span>
       </div>
 
@@ -147,7 +148,7 @@ export default function CardPicker({ title, excludeIds, onAdd, onClose }) {
                   ) : null}
                   <span className="picker-row-text">
                     <span className="picker-row-name">{card.name}</span>
-                    <span className="picker-row-set">{card.set} · {card.number}</span>
+                    <CardMeta card={card} className="picker-row-set" />
                   </span>
                   <span className="picker-row-add" aria-hidden="true">+</span>
                 </button>

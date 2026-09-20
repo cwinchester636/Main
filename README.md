@@ -60,9 +60,9 @@ If a live API is unreachable, the picker shows a warning and falls back to a sma
 
 ## Live pricing
 
-Every card added from a live search shows its current TCGplayer-sourced market value next to its set and collector number (Pokemon TCG API's `tcgplayer.prices`, Scryfall's `prices.usd`, YGOPRODeck's `card_prices[].tcgplayer_price`) — no separate TCGplayer integration, just reading a field the search already fetched.
+Every live-sourced card shows its current TCGplayer-sourced market value next to its set and collector number (Pokemon TCG API's `tcgplayer.prices`, Scryfall's `prices.usd`, YGOPRODeck's `card_prices[].tcgplayer_price`) — no separate TCGplayer integration, just reading a field the search already fetched. This is one line, `CardMeta` (`src/components/CardMeta.jsx`), used everywhere a card is shown — the picker's search results, the condition step's preview *as you're selecting it*, and every `CardChip` in Collection and Matches — so there's no place in the app where a card's set/number shows without its value alongside it (when one's resolvable at all; see below).
 
-**How "live" it stays.** A price isn't stored anywhere — it never touches the backend or D1 at all. Each `CardChip` (`src/components/CardChip.jsx`, via `src/hooks/useCardPrice.js`) fetches it directly from the browser the moment the card renders, the same way search itself works. That means it's current as of whenever you're looking at it, not a snapshot from whenever the card was added — genuinely "most up to date," at the cost of a re-fetch (not a page-load-time value fixed in the database) every time you open Collection or Matches. Results are cached in memory for the rest of the tab session, so re-rendering the same card (e.g. switching tabs and back) doesn't re-request it — a fresh page load always gets a fresh price.
+**How "live" it stays.** A price isn't stored anywhere — it never touches the backend or D1 at all. Each `CardMeta` (via `src/hooks/useCardPrice.js`) fetches it directly from the browser the moment the card renders, the same way search itself works. That means it's current as of whenever you're looking at it, not a snapshot from whenever the card was added — genuinely "most up to date," at the cost of a re-fetch (not a page-load-time value fixed in the database) every time you open Collection or Matches. Results are cached in memory for the rest of the tab session, so re-rendering the same card (e.g. switching tabs and back) doesn't re-request it — a fresh page load always gets a fresh price.
 
 **Why this needed a schema change.** Once a card is saved to a Have/Want list, its `id` becomes the collection row's own id (stable — it's what "remove card" deletes by). The original live-search id (e.g. `live-pkmn-base1-4`, which a price lookup needs) is preserved separately as `sourceId` (`source_id` column, added in `worker/migrations/0004_collection_source_id.sql`) — `id` and `sourceId` deliberately serve two different jobs and are never conflated.
 
@@ -153,7 +153,7 @@ npm run dev              # wrangler dev on :8787
 - `src/hooks/useLocalStorage.js` — persists the auth token on-device.
 - `src/utils/rarity.js` — maps each live API's rarity vocabulary onto the app's 5-bucket scale.
 - `src/utils/distance.js` — formats a match's distance label, preferring real `distanceMiles` over the ZIP-prefix fallback.
-- `src/components/` — `Onboarding`, `BottomNav`, `HomeView`, `CollectionView`, `CardPicker`, `CardChip`, `MatchesView`, `TradesView`, `ValueDisparityModal`, `ProfileView`, `AvatarPicker`, `AvatarIcon`.
+- `src/components/` — `Onboarding`, `BottomNav`, `HomeView`, `CollectionView`, `CardPicker`, `CardChip`, `CardMeta` (set/number/price, shared by `CardChip` and `CardPicker`), `MatchesView`, `TradesView`, `ValueDisparityModal`, `ProfileView`, `AvatarPicker`, `AvatarIcon`.
 - `src/App.jsx` — auth/session orchestration, data fetching, tab navigation.
 
 **Frontend deploy**

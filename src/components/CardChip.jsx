@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { GAMES } from '../data/cards.js'
 import { CONDITION_LABEL } from '../data/conditions.js'
-import { useCardPrice } from '../hooks/useCardPrice.js'
-import { formatUSD } from '../utils/currency.js'
+import CardMeta from './CardMeta.jsx'
 
 const gameEmoji = (gameId) => GAMES.find((g) => g.id === gameId)?.emoji ?? '🃏'
 
@@ -14,12 +13,6 @@ function conditionText(card) {
 
 export default function CardChip({ card, onRemove, compact = false }) {
   const [imageFailed, setImageFailed] = useState(false)
-  // Once a card is saved server-side, `id` becomes the collection row's own
-  // (stable, needed for removal) id — `sourceId` is the original live-search
-  // id a price lookup actually needs. Falls back to `id` for cards that
-  // haven't round-tripped through the backend yet (e.g. a fresh search
-  // result), where it's still the live id itself.
-  const price = useCardPrice(card.sourceId ?? card.id)
   const condition = conditionText(card)
 
   return (
@@ -36,10 +29,7 @@ export default function CardChip({ card, onRemove, compact = false }) {
       )}
       <span className="card-chip-text">
         <span className="card-chip-name">{card.name}</span>
-        <span className="card-chip-set">
-          {card.set} · {card.number}
-          {price && <span className="card-chip-price"> · {formatUSD(price.amount)}</span>}
-        </span>
+        <CardMeta card={card} className="card-chip-set" />
         {condition && <span className="card-chip-condition">{condition}</span>}
       </span>
       {onRemove && (
