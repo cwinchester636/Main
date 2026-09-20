@@ -42,6 +42,12 @@ export function useCardSearch(query, gameFilter) {
 
       const succeeded = settled.filter((r) => r.status === 'fulfilled')
       if (succeeded.length === 0) {
+        // Every provider rejected — log the real reasons rather than just
+        // showing the generic "unavailable" message, since the three live
+        // APIs have never been reachable from this project's dev sandbox
+        // and this is the only way to see what actually broke for a real
+        // user (network error, CORS, rate limit, etc).
+        settled.forEach((r, i) => console.error(`live search failed for ${gamesToQuery[i]}:`, r.reason))
         setLiveStatus('error')
         setLiveResults([])
         return
