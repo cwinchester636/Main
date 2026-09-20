@@ -116,6 +116,8 @@ export async function listTrades(env) {
         fromConfirmedAt: row.from_confirmed_at,
         toConfirmedAt: row.to_confirmed_at,
         completedAt: completedAt(row),
+        fromCash: row.from_cash,
+        toCash: row.to_cash,
         from: { id: row.from_account_id, username: row.from_username, email: row.from_email, avatar: row.from_avatar },
         to: { id: row.to_account_id, username: row.to_username, email: row.to_email, avatar: row.to_avatar },
         fromOffered: cards.filter((c) => c.owner_account_id === row.from_account_id).map(serializeSnapshotCard),

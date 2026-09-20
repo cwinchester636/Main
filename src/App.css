@@ -241,6 +241,36 @@
   display: block;
 }
 
+.cash-input {
+  display: block;
+  margin: 10px 0;
+}
+
+.cash-input-row {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  overflow: hidden;
+}
+
+.cash-input-prefix {
+  padding: 11px 0 11px 14px;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.cash-input-row .text-input {
+  border: none;
+  margin-bottom: 0;
+  padding-left: 4px;
+}
+
+.cash-input-row .text-input:focus {
+  outline: none;
+}
+
 /* Stats row (Home) */
 .stat-row {
   display: flex;
@@ -818,6 +848,11 @@
   color: var(--danger);
 }
 
+.trade-actions-column {
+  display: flex;
+  flex-direction: column;
+}
+
 .trade-actions {
   display: flex;
   gap: 8px;
@@ -850,6 +885,11 @@
 
 .disparity-row:last-of-type {
   border-bottom: none;
+}
+
+.disparity-cash-note {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
 }
 
 /* Admin */

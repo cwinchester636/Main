@@ -100,14 +100,14 @@ export default function App() {
     setAuthStatus('anonymous')
   }
 
-  const proposeTrade = async (toAccountId) => {
-    await api.proposeTrade(token, toAccountId)
+  const proposeTrade = async (toAccountId, cashAmount) => {
+    await api.proposeTrade(token, toAccountId, cashAmount)
     const tradeData = await api.getTrades(token)
     setTrades(tradeData)
   }
 
-  const respondToTrade = async (tradeId, action) => {
-    await api.respondToTrade(token, tradeId, action)
+  const respondToTrade = async (tradeId, action, cashAmount) => {
+    await api.respondToTrade(token, tradeId, action, cashAmount)
     const tradeData = await api.getTrades(token)
     setTrades(tradeData)
   }

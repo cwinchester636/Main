@@ -3,6 +3,7 @@ import AvatarIcon from './AvatarIcon.jsx'
 import CardChip from './CardChip.jsx'
 import PhotoViewerModal from './PhotoViewerModal.jsx'
 import { api, ApiError } from '../api/client.js'
+import { formatUSD } from '../utils/currency.js'
 
 function formatDate(ts) {
   if (!ts) return null
@@ -115,6 +116,14 @@ function AdminTradeCard({ trade, token }) {
         {trade.to.username}: {trade.to.email || 'no email'}
         {trade.toConfirmedAt ? ' · confirmed' : ''}
       </p>
+
+      {(trade.fromCash > 0 || trade.toCash > 0) && (
+        <p className="section-hint">
+          💵{trade.fromCash > 0 ? ` ${trade.from.username} added ${formatUSD(trade.fromCash)}` : ''}
+          {trade.fromCash > 0 && trade.toCash > 0 ? ' · ' : ''}
+          {trade.toCash > 0 ? `${trade.to.username} added ${formatUSD(trade.toCash)}` : ''}
+        </p>
+      )}
 
       {(trade.fromOffered.length > 0 || trade.toOffered.length > 0) ? (
         <div className="admin-trade-cards">

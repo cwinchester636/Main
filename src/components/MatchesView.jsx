@@ -3,6 +3,7 @@ import CardChip from './CardChip.jsx'
 import AvatarIcon from './AvatarIcon.jsx'
 import ValueDisparityModal from './ValueDisparityModal.jsx'
 import PhotoViewerModal from './PhotoViewerModal.jsx'
+import CashInput from './CashInput.jsx'
 import { distanceLabel } from '../utils/distance.js'
 import { checkValueDisparity } from '../utils/tradeValue.js'
 
@@ -12,18 +13,20 @@ function MatchCard({ match, isProposed, onPropose, token }) {
   const [checkingValue, setCheckingValue] = useState(false)
   const [disparity, setDisparity] = useState(null)
   const [viewingPhotoId, setViewingPhotoId] = useState(null)
+  const [cashInput, setCashInput] = useState('')
   const { account, theyHaveYouWant, youHaveTheyWant, isMutual } = match
   const proximityLabel = distanceLabel(match)
+  const cashAmount = Number(cashInput) || 0
 
   const doPropose = async () => {
     setProposing(true)
-    await onPropose(account.id)
+    await onPropose(account.id, cashAmount)
     setProposing(false)
   }
 
   const handleProposeClick = async () => {
     setCheckingValue(true)
-    const result = await checkValueDisparity(theyHaveYouWant, youHaveTheyWant)
+    const result = await checkValueDisparity(theyHaveYouWant, youHaveTheyWant, { yourCash: cashAmount })
     setCheckingValue(false)
     if (result?.imbalanced) setDisparity(result)
     else await doPropose()
@@ -68,6 +71,10 @@ function MatchCard({ match, isProposed, onPropose, token }) {
             </div>
           )}
 
+          {!isProposed && (
+            <CashInput value={cashInput} onChange={setCashInput} label={`Add cash toward ${account.username}'s cards (optional)`} />
+          )}
+
           <button
             type="button"
             className={`button ${isProposed ? 'secondary' : 'primary'} full`}
@@ -89,6 +96,7 @@ function MatchCard({ match, isProposed, onPropose, token }) {
           yourLabel="Your cards"
           theirValue={disparity.theirValue}
           yourValue={disparity.yourValue}
+          yourCash={cashAmount}
           disparity={disparity.disparity}
           onCancel={() => setDisparity(null)}
           onConfirm={async () => {

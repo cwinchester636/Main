@@ -13,6 +13,16 @@ export function completedAt(row) {
   return Math.max(row.from_confirmed_at, row.to_confirmed_at)
 }
 
+// undefined -> absent/malformed input, distinct from 0 (a valid "no cash
+// added"). Never touches real money — see migrations/0010_trade_cash.sql —
+// this is just validating a noted amount.
+function parseCashAmount(value) {
+  if (value === undefined || value === null) return 0
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < 0) return undefined
+  return Math.round(n * 100) / 100
+}
+
 // What each side was offering at propose time: the from-account's haves
 // that match the to-account's wants, and vice versa — same matchKey logic
 // as matches.js, just narrowed to one specific pair instead of everyone.
@@ -82,6 +92,9 @@ export async function proposeTrade(request, env, account) {
   if (!body || typeof body.toAccountId !== 'string') return error('toAccountId is required')
   if (body.toAccountId === account.id) return error('cannot propose a trade to yourself')
 
+  const fromCash = parseCashAmount(body.cashAmount)
+  if (fromCash === undefined) return error('cashAmount must be a non-negative number')
+
   const target = await env.DB.prepare('SELECT id FROM accounts WHERE id = ?').bind(body.toAccountId).first()
   if (!target) return error('account not found', 404)
 
@@ -102,14 +115,27 @@ export async function proposeTrade(request, env, account) {
 
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO trade_proposals (id, from_account_id, to_account_id, status, created_at)
-       VALUES (?, ?, ?, 'pending', ?)`,
-    ).bind(id, account.id, body.toAccountId, createdAt),
+      `INSERT INTO trade_proposals (id, from_account_id, to_account_id, status, from_cash, created_at)
+       VALUES (?, ?, ?, 'pending', ?, ?)`,
+    ).bind(id, account.id, body.toAccountId, fromCash, createdAt),
     ...fromOffers.map((row, i) => snapshotInsert(env, id, account.id, row, fromPhotoKeys[i], createdAt)),
     ...toOffers.map((row, i) => snapshotInsert(env, id, body.toAccountId, row, toPhotoKeys[i], createdAt)),
   ])
 
-  return json({ proposal: { id, from_account_id: account.id, to_account_id: body.toAccountId, status: 'pending', created_at: createdAt } }, 201)
+  return json(
+    {
+      proposal: {
+        id,
+        from_account_id: account.id,
+        to_account_id: body.toAccountId,
+        status: 'pending',
+        from_cash: fromCash,
+        to_cash: 0,
+        created_at: createdAt,
+      },
+    },
+    201,
+  )
 }
 
 export async function getTrades(env, account) {
@@ -138,6 +164,8 @@ export async function getTrades(env, account) {
       completedAt: completedAt(row),
       confirmedByMe: !!myConfirmedAt,
       confirmedByThem: !!theirConfirmedAt,
+      myCash: isFrom ? row.from_cash : row.to_cash,
+      theirCash: isFrom ? row.to_cash : row.from_cash,
       counterparty: isFrom
         ? { id: row.to_account_id, username: row.to_username, avatar: row.to_avatar }
         : { id: row.from_account_id, username: row.from_username, avatar: row.from_avatar },
@@ -160,12 +188,21 @@ export async function respondToTrade(request, env, account, tradeId) {
   if (row.to_account_id !== account.id) return error('only the recipient can respond to this trade', 403)
   if (row.status !== 'pending') return error(`trade is already ${row.status}`)
 
+  // Only accept adds cash — the recipient decides theirs at their own step,
+  // same as the proposer did at propose time (see migrations/0010). A
+  // decline has nothing to add cash to.
+  let toCash = 0
+  if (body.action === 'accept') {
+    toCash = parseCashAmount(body.cashAmount)
+    if (toCash === undefined) return error('cashAmount must be a non-negative number')
+  }
+
   const status = body.action === 'accept' ? 'accepted' : 'declined'
-  await env.DB.prepare('UPDATE trade_proposals SET status = ? WHERE id = ?')
-    .bind(status, tradeId)
+  await env.DB.prepare('UPDATE trade_proposals SET status = ?, to_cash = ? WHERE id = ?')
+    .bind(status, toCash, tradeId)
     .run()
 
-  return json({ proposal: { ...row, status } })
+  return json({ proposal: { ...row, status, to_cash: toCash } })
 }
 
 export async function confirmTrade(env, account, tradeId) {

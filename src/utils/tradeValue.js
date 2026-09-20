@@ -16,8 +16,15 @@ async function totalValue(cards) {
 // count toward either total — this only ever warns when there's *known*
 // value backing the disparity, never on a guess. Returns null when there's
 // nothing priced on either side to compare at all.
-export async function checkValueDisparity(theirCards, yourCards) {
-  const [theirValue, yourValue] = await Promise.all([totalValue(theirCards), totalValue(yourCards)])
+//
+// theirCash/yourCash: any noted cash a side is adding on top of their
+// cards (see migrations/0010_trade_cash.sql) — added straight into that
+// side's total, same as a card's price would be, since that's exactly
+// what it's for: closing the gap a card-only comparison would flag.
+export async function checkValueDisparity(theirCards, yourCards, { theirCash = 0, yourCash = 0 } = {}) {
+  const [theirCardsValue, yourCardsValue] = await Promise.all([totalValue(theirCards), totalValue(yourCards)])
+  const theirValue = theirCardsValue + theirCash
+  const yourValue = yourCardsValue + yourCash
   if (theirValue === 0 && yourValue === 0) return null
 
   const larger = Math.max(theirValue, yourValue)

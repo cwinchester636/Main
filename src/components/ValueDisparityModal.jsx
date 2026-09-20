@@ -1,6 +1,16 @@
 import { formatUSD } from '../utils/currency.js'
 
-export default function ValueDisparityModal({ theirLabel, yourLabel, theirValue, yourValue, disparity, onCancel, onConfirm }) {
+export default function ValueDisparityModal({
+  theirLabel,
+  yourLabel,
+  theirValue,
+  yourValue,
+  theirCash = 0,
+  yourCash = 0,
+  disparity,
+  onCancel,
+  onConfirm,
+}) {
   return (
     <div className="sheet-backdrop" onClick={onCancel}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -12,17 +22,23 @@ export default function ValueDisparityModal({ theirLabel, yourLabel, theirValue,
         <p>These two sides aren't close in value — about {Math.round(disparity * 100)}% apart.</p>
 
         <div className="disparity-row">
-          <span>{theirLabel}</span>
+          <span>
+            {theirLabel}
+            {theirCash > 0 && <span className="disparity-cash-note"> (incl. {formatUSD(theirCash)} cash)</span>}
+          </span>
           <strong>{formatUSD(theirValue)}</strong>
         </div>
         <div className="disparity-row">
-          <span>{yourLabel}</span>
+          <span>
+            {yourLabel}
+            {yourCash > 0 && <span className="disparity-cash-note"> (incl. {formatUSD(yourCash)} cash)</span>}
+          </span>
           <strong>{formatUSD(yourValue)}</strong>
         </div>
 
         <p className="section-hint">
-          Based on current market prices for cards with a known live price — cards without one aren't counted, so the
-          real gap could be smaller (or larger) than this.
+          Based on current market prices for cards with a known live price, plus any cash either side has added —
+          cards without a known price aren't counted, so the real gap could be smaller (or larger) than this.
         </p>
 
         <div className="trade-actions">
