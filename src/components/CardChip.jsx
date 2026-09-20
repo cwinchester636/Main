@@ -11,7 +11,7 @@ function conditionText(card) {
   return CONDITION_LABEL[card.condition] ?? null
 }
 
-export default function CardChip({ card, onRemove, compact = false }) {
+export default function CardChip({ card, onRemove, onViewPhoto, compact = false }) {
   const [imageFailed, setImageFailed] = useState(false)
   const condition = conditionText(card)
 
@@ -32,6 +32,16 @@ export default function CardChip({ card, onRemove, compact = false }) {
         <CardMeta card={card} className="card-chip-set" />
         {condition && <span className="card-chip-condition">{condition}</span>}
       </span>
+      {card.hasPhoto && onViewPhoto && (
+        <button
+          type="button"
+          className="card-chip-photo-btn"
+          onClick={() => onViewPhoto(card.id)}
+          aria-label={`View verification photo for ${card.name}`}
+        >
+          📷
+        </button>
+      )}
       {onRemove && (
         <button
           type="button"

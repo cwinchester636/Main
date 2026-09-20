@@ -1,0 +1,15 @@
+-- Verification photo for a collection item: proof the owner actually holds
+-- the specific physical card, not just a claim. Required for 'have' items
+-- (enforced in collection.js, not here -- SQLite can't reference list_type
+-- in a column CHECK the way collection.js's parseCondition already can't
+-- for condition/grade, same reasoning as migrations/0005), always null for
+-- 'want' items since wanting a card isn't a possession claim.
+--
+-- Stores a KV key (see [[kv_namespaces]] PHOTOS in wrangler.toml), not the
+-- image bytes themselves -- same denormalized-pointer approach as every
+-- other blob-shaped thing in this schema. Nothing reads this column
+-- directly as a public URL: worker/src/routes/collection.js serves it
+-- through an authenticated endpoint that decides on every request whether
+-- the requester is allowed to see it (see "Card verification photos" in
+-- README).
+ALTER TABLE collection_items ADD COLUMN photo_key TEXT;

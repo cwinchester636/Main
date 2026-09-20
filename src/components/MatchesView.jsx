@@ -2,14 +2,16 @@ import { useState } from 'react'
 import CardChip from './CardChip.jsx'
 import AvatarIcon from './AvatarIcon.jsx'
 import ValueDisparityModal from './ValueDisparityModal.jsx'
+import PhotoViewerModal from './PhotoViewerModal.jsx'
 import { distanceLabel } from '../utils/distance.js'
 import { checkValueDisparity } from '../utils/tradeValue.js'
 
-function MatchCard({ match, isProposed, onPropose }) {
+function MatchCard({ match, isProposed, onPropose, token }) {
   const [open, setOpen] = useState(false)
   const [proposing, setProposing] = useState(false)
   const [checkingValue, setCheckingValue] = useState(false)
   const [disparity, setDisparity] = useState(null)
+  const [viewingPhotoId, setViewingPhotoId] = useState(null)
   const { account, theyHaveYouWant, youHaveTheyWant, isMutual } = match
   const proximityLabel = distanceLabel(match)
 
@@ -50,7 +52,7 @@ function MatchCard({ match, isProposed, onPropose }) {
               <h3>They have (you want)</h3>
               <div className="card-chip-list">
                 {theyHaveYouWant.map((card) => (
-                  <CardChip key={card.id} card={card} compact />
+                  <CardChip key={card.id} card={card} compact onViewPhoto={setViewingPhotoId} />
                 ))}
               </div>
             </div>
@@ -95,11 +97,15 @@ function MatchCard({ match, isProposed, onPropose }) {
           }}
         />
       )}
+
+      {viewingPhotoId && (
+        <PhotoViewerModal token={token} itemId={viewingPhotoId} onClose={() => setViewingPhotoId(null)} />
+      )}
     </div>
   )
 }
 
-export default function MatchesView({ matches, hasHaves, hasWants, proposedAccountIds, onPropose }) {
+export default function MatchesView({ matches, hasHaves, hasWants, proposedAccountIds, onPropose, token }) {
   if (!hasHaves || !hasWants) {
     return (
       <div className="view">
@@ -126,6 +132,7 @@ export default function MatchesView({ matches, hasHaves, hasWants, proposedAccou
           <MatchCard
             key={match.account.id}
             match={match}
+            token={token}
             isProposed={proposedAccountIds.includes(match.account.id)}
             onPropose={onPropose}
           />

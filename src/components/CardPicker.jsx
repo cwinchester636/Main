@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { GAMES } from '../data/cards.js'
 import { CONDITIONS, MIN_GRADE, MAX_GRADE } from '../data/conditions.js'
 import { useCardSearch } from '../hooks/useCardSearch.js'
 import CardMeta from './CardMeta.jsx'
 
-function ConditionStep({ card, onConfirm, onBack }) {
+function ConditionStep({ card, listType, onConfirm, onBack }) {
   const [condition, setCondition] = useState('NM')
   const [grade, setGrade] = useState('')
 
@@ -65,36 +65,158 @@ function ConditionStep({ card, onConfirm, onBack }) {
         disabled={!canConfirm}
         onClick={() => onConfirm({ condition, grade: condition === 'graded' ? gradeNum : null })}
       >
-        Add to list
+        {listType === 'have' ? 'Continue to photo' : 'Add to list'}
       </button>
     </div>
   )
 }
 
-export default function CardPicker({ title, excludeIds, onAdd, onClose }) {
+// Downscales to a max dimension and re-encodes as JPEG before upload — a
+// phone camera capture can be several MB straight off the sensor, and
+// nothing about a verification photo needs that resolution.
+const MAX_PHOTO_DIMENSION = 1200
+const PHOTO_QUALITY = 0.82
+
+function resizePhoto(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      let { width, height } = img
+      if (width > MAX_PHOTO_DIMENSION || height > MAX_PHOTO_DIMENSION) {
+        const scale = MAX_PHOTO_DIMENSION / Math.max(width, height)
+        width = Math.round(width * scale)
+        height = Math.round(height * scale)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error('could not encode photo'))),
+        'image/jpeg',
+        PHOTO_QUALITY,
+      )
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('could not read photo'))
+    }
+    img.src = objectUrl
+  })
+}
+
+function PhotoStep({ card, onConfirm, onBack }) {
+  const [preview, setPreview] = useState(null)
+  const [blob, setBlob] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const inputRef = useRef(null)
+
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
+
+  const handleFile = async (file) => {
+    if (!file) return
+    setBusy(true)
+    setError('')
+    try {
+      const resized = await resizePhoto(file)
+      setPreview((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return URL.createObjectURL(resized)
+      })
+      setBlob(resized)
+    } catch {
+      setError('Could not process that photo — try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="condition-step">
+      <button type="button" className="link-button" onClick={onBack}>← Back</button>
+
+      <p className="field-label">Photo of your {card.name}</p>
+      <p className="section-hint">
+        Take a photo of the actual card in hand — this proves you hold it, and can be shown to matched trade partners.
+      </p>
+
+      {preview ? (
+        <img className="photo-step-preview" src={preview} alt="" />
+      ) : (
+        <div className="photo-step-placeholder" aria-hidden="true">📷</div>
+      )}
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="visually-hidden"
+        onChange={(e) => handleFile(e.target.files?.[0])}
+      />
+      <button
+        type="button"
+        className="button secondary full"
+        disabled={busy}
+        onClick={() => inputRef.current?.click()}
+      >
+        {busy ? 'Processing…' : preview ? 'Retake photo' : 'Take photo'}
+      </button>
+
+      {error && <p className="form-error">{error}</p>}
+
+      <button type="button" className="button primary full" disabled={!blob || busy} onClick={() => onConfirm(blob)}>
+        Add to Haves
+      </button>
+    </div>
+  )
+}
+
+export default function CardPicker({ title, listType, excludeIds, onAdd, onClose }) {
   const [query, setQuery] = useState('')
   const [gameFilter, setGameFilter] = useState('all')
-  const [selectedCard, setSelectedCard] = useState(null)
+  const [pendingCard, setPendingCard] = useState(null)
+  const [step, setStep] = useState('search') // search | condition | photo
   const { results, liveStatus } = useCardSearch(query, gameFilter)
 
   const excludeSet = useMemo(() => new Set(excludeIds), [excludeIds])
   const visibleResults = results.filter((card) => !excludeSet.has(card.id))
 
+  const headerTitle = step === 'photo' ? 'Verify with a photo' : step === 'condition' ? 'Card condition' : title
+
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-header">
-          <h2>{selectedCard ? 'Card condition' : title}</h2>
+          <h2>{headerTitle}</h2>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close">×</button>
         </div>
 
-        {selectedCard ? (
+        {step === 'condition' && (
           <ConditionStep
-            card={selectedCard}
-            onBack={() => setSelectedCard(null)}
-            onConfirm={({ condition, grade }) => onAdd({ ...selectedCard, condition, grade })}
+            card={pendingCard}
+            listType={listType}
+            onBack={() => setStep('search')}
+            onConfirm={({ condition, grade }) => {
+              const withCondition = { ...pendingCard, condition, grade }
+              if (listType === 'have') {
+                setPendingCard(withCondition)
+                setStep('photo')
+              } else {
+                onAdd(withCondition)
+              }
+            }}
           />
-        ) : (
+        )}
+
+        {step === 'photo' && (
+          <PhotoStep card={pendingCard} onBack={() => setStep('condition')} onConfirm={(photo) => onAdd(pendingCard, photo)} />
+        )}
+
+        {step === 'search' && (
           <>
             <input
               type="text"
@@ -141,7 +263,10 @@ export default function CardPicker({ title, excludeIds, onAdd, onClose }) {
                   key={card.id}
                   type="button"
                   className="picker-row"
-                  onClick={() => setSelectedCard(card)}
+                  onClick={() => {
+                    setPendingCard(card)
+                    setStep('condition')
+                  }}
                 >
                   {card.image ? (
                     <img className="picker-row-image" src={card.image} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import CardChip from './CardChip.jsx'
 import CardPicker from './CardPicker.jsx'
+import PhotoViewerModal from './PhotoViewerModal.jsx'
 
-function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove }) {
+function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove, onViewPhoto }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -26,6 +27,7 @@ function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove
             <CardChip
               key={card.id}
               card={card}
+              onViewPhoto={onViewPhoto}
               onRemove={async (id) => {
                 setBusy(true)
                 await onRemove(listType, id)
@@ -39,11 +41,12 @@ function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove
       {pickerOpen && (
         <CardPicker
           title={listType === 'have' ? 'Add a card you have' : 'Add a card you want'}
+          listType={listType}
           excludeIds={[...cards, ...otherCards].map((c) => c.id)}
-          onAdd={async (card) => {
+          onAdd={async (card, photo) => {
             setPickerOpen(false)
             setBusy(true)
-            await onAdd(listType, card)
+            await onAdd(listType, card, photo)
             setBusy(false)
           }}
           onClose={() => setPickerOpen(false)}
@@ -53,7 +56,9 @@ function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove
   )
 }
 
-export default function CollectionView({ haves, wants, onAdd, onRemove }) {
+export default function CollectionView({ haves, wants, onAdd, onRemove, token }) {
+  const [viewingPhotoId, setViewingPhotoId] = useState(null)
+
   return (
     <div className="view">
       <h1>My Collection</h1>
@@ -69,6 +74,7 @@ export default function CollectionView({ haves, wants, onAdd, onRemove }) {
         otherCards={wants}
         onAdd={onAdd}
         onRemove={onRemove}
+        onViewPhoto={setViewingPhotoId}
       />
 
       <CardSection
@@ -80,6 +86,10 @@ export default function CollectionView({ haves, wants, onAdd, onRemove }) {
         onAdd={onAdd}
         onRemove={onRemove}
       />
+
+      {viewingPhotoId && (
+        <PhotoViewerModal token={token} itemId={viewingPhotoId} onClose={() => setViewingPhotoId(null)} />
+      )}
     </div>
   )
 }

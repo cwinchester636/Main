@@ -8,6 +8,15 @@ database_name = "swapdeck"
 database_id = "30d86cca-a44d-4300-84e1-2bf9f7dfdc12"
 migrations_dir = "migrations"
 
+# Card verification photos (see migrations/0008_card_photos.sql). KV rather
+# than R2 -- R2 needs a one-time opt-in from the Cloudflare Dashboard that
+# nothing here can do via API, while KV worked out of the box. Values are
+# resized client-side to a few hundred KB before upload, well inside KV's
+# per-value limit, so there's no real downside at this app's scale.
+[[kv_namespaces]]
+binding = "PHOTOS"
+id = "1da319054a174eff885a7f73a4a6175e"
+
 [vars]
 # Comma-separated usernames with access to the Admin tab (list/delete any
 # account). Not a secret — this is a plain wrangler.toml var, checked into

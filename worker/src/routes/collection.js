@@ -1,9 +1,15 @@
-import { error, json, newId } from '../utils.js'
+import { error, json, newId, matchKey, CORS_HEADERS } from '../utils.js'
+import { isAdminUsername } from '../admin.js'
 
 // Kept in sync with src/data/conditions.js (the frontend can't import
 // across the worker/ boundary, so this is intentionally duplicated —
 // same tradeoff as RADIUS_OPTIONS in accounts.js).
 const CONDITION_IDS = ['HP', 'MP', 'LP', 'NM', 'graded']
+
+// The client resizes photos to a few hundred KB before upload (see
+// PhotoStep in CardPicker.jsx) — this is just a hard backstop against a
+// client that skips that step, not the expected size in practice.
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024
 
 function serializeCard(row) {
   return {
@@ -17,6 +23,7 @@ function serializeCard(row) {
     image: row.image,
     condition: row.condition ?? null,
     grade: row.grade ?? null,
+    hasPhoto: !!row.photo_key,
   }
 }
 
@@ -44,12 +51,25 @@ export async function getCollection(env, account) {
   return json({ haves, wants })
 }
 
+// Cards are added as multipart/form-data, not JSON, so a 'have' can carry a
+// verification photo in the same request: { listType, card (JSON string),
+// photo? (File) }. 'want' items never take a photo — wanting a card isn't a
+// possession claim, nothing to verify.
 export async function addCollectionItem(request, env, account) {
-  const body = await request.json().catch(() => null)
-  if (!body || (body.listType !== 'have' && body.listType !== 'want')) {
+  const form = await request.formData().catch(() => null)
+  if (!form) return error('malformed request')
+
+  const listType = form.get('listType')
+  if (listType !== 'have' && listType !== 'want') {
     return error('listType must be "have" or "want"')
   }
-  const card = body.card
+
+  let card
+  try {
+    card = JSON.parse(form.get('card') ?? '')
+  } catch {
+    card = null
+  }
   if (!card || typeof card.name !== 'string' || typeof card.game !== 'string') {
     return error('card.name and card.game are required')
   }
@@ -58,16 +78,30 @@ export async function addCollectionItem(request, env, account) {
     return error(`condition must be one of ${CONDITION_IDS.join(', ')}, and graded requires a grade 1-10`)
   }
 
+  const photo = form.get('photo')
+  const hasPhoto = photo instanceof File && photo.size > 0
+  if (listType === 'have' && !hasPhoto) {
+    return error('a photo proving you hold this card is required to add it to your Haves')
+  }
+
+  let photoKey = null
+  if (hasPhoto) {
+    if (!photo.type.startsWith('image/')) return error('photo must be an image')
+    if (photo.size > MAX_PHOTO_BYTES) return error('photo is too large')
+    photoKey = `${account.id}/${newId()}`
+    await env.PHOTOS.put(photoKey, await photo.arrayBuffer(), { metadata: { contentType: photo.type } })
+  }
+
   const id = newId()
   const sourceId = typeof card.id === 'string' ? card.id : null
   await env.DB.prepare(
-    `INSERT INTO collection_items (id, account_id, list_type, game, name, set_name, number, rarity, image, source_id, condition, grade, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO collection_items (id, account_id, list_type, game, name, set_name, number, rarity, image, source_id, condition, grade, photo_key, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
       account.id,
-      body.listType,
+      listType,
       card.game,
       card.name,
       card.set ?? null,
@@ -77,21 +111,74 @@ export async function addCollectionItem(request, env, account) {
       sourceId,
       parsedCondition.condition,
       parsedCondition.grade,
+      photoKey,
       Date.now(),
     )
     .run()
 
   return json(
-    { item: serializeCard({ ...card, id, set_name: card.set, source_id: sourceId, ...parsedCondition }) },
+    {
+      item: serializeCard({
+        ...card,
+        id,
+        set_name: card.set,
+        source_id: sourceId,
+        photo_key: photoKey,
+        ...parsedCondition,
+      }),
+    },
     201,
   )
 }
 
 export async function deleteCollectionItem(env, account, itemId) {
-  const result = await env.DB.prepare('DELETE FROM collection_items WHERE id = ? AND account_id = ?')
+  const row = await env.DB.prepare('SELECT photo_key FROM collection_items WHERE id = ? AND account_id = ?')
+    .bind(itemId, account.id)
+    .first()
+  if (!row) return error('not found', 404)
+
+  await env.DB.prepare('DELETE FROM collection_items WHERE id = ? AND account_id = ?')
     .bind(itemId, account.id)
     .run()
 
-  if (result.meta.changes === 0) return error('not found', 404)
+  // Best-effort — an orphaned KV entry just wastes a little storage, not
+  // worth failing the delete over.
+  if (row.photo_key) await env.PHOTOS.delete(row.photo_key).catch(() => {})
+
   return json({ deleted: itemId })
+}
+
+// Who can see a card's verification photo: its owner, an admin (dispute
+// review), or someone who currently wants this exact card — i.e. it's
+// showing up as a match for them in matches.js. Not "anyone who's matched
+// with this account at all": scoped to the specific card, same matchKey
+// logic used everywhere else a "does this count as the same card" question
+// comes up.
+export async function getCollectionItemPhoto(env, account, itemId) {
+  const item = await env.DB.prepare('SELECT * FROM collection_items WHERE id = ?').bind(itemId).first()
+  if (!item || !item.photo_key) return error('not found', 404)
+
+  const isOwner = item.account_id === account.id
+  const isAdmin = isAdminUsername(account.username, env)
+
+  if (!isOwner && !isAdmin) {
+    const wants = await env.DB.prepare(
+      `SELECT game, name FROM collection_items WHERE account_id = ? AND list_type = 'want'`,
+    )
+      .bind(account.id)
+      .all()
+    const isMatchedPartner = wants.results.some((w) => matchKey(w.game, w.name) === matchKey(item.game, item.name))
+    if (!isMatchedPartner) return error('not authorized to view this photo', 403)
+  }
+
+  const object = await env.PHOTOS.getWithMetadata(item.photo_key, 'arrayBuffer')
+  if (!object?.value) return error('photo not found', 404)
+
+  return new Response(object.value, {
+    headers: {
+      'Content-Type': object.metadata?.contentType || 'image/jpeg',
+      'Cache-Control': 'private, max-age=3600',
+      ...CORS_HEADERS,
+    },
+  })
 }

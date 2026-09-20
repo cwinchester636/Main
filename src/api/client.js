@@ -12,15 +12,16 @@ export class ApiError extends Error {
 }
 
 async function request(path, { method = 'GET', token, body } = {}) {
+  const isForm = body instanceof FormData
   let res
   try {
     res = await fetch(`${API_BASE}${path}`, {
       method,
       headers: {
-        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(body && !isForm ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: isForm ? body : body ? JSON.stringify(body) : undefined,
     })
   } catch (cause) {
     throw new ApiError('Can’t reach the SwapDeck server. Check your connection and try again.', 0, cause)
@@ -31,6 +32,22 @@ async function request(path, { method = 'GET', token, body } = {}) {
   return data
 }
 
+// Not JSON, so it can't go through request() above — returns a Blob for
+// direct use as an <img> src via URL.createObjectURL.
+async function fetchBlob(path, token) {
+  let res
+  try {
+    res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } })
+  } catch (cause) {
+    throw new ApiError('Can’t reach the SwapDeck server. Check your connection and try again.', 0, cause)
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(data.error || `Request failed (${res.status})`, res.status)
+  }
+  return res.blob()
+}
+
 export const api = {
   createAccount: (body) => request('/api/accounts', { method: 'POST', body }),
   login: (body) => request('/api/login', { method: 'POST', body }),
@@ -38,10 +55,16 @@ export const api = {
   updateMe: (token, body) => request('/api/me', { method: 'PATCH', token, body }),
 
   getCollection: (token) => request('/api/collection', { token }),
-  addCollectionItem: (token, listType, card) =>
-    request('/api/collection', { method: 'POST', token, body: { listType, card } }),
+  addCollectionItem: (token, listType, card, photo) => {
+    const form = new FormData()
+    form.append('listType', listType)
+    form.append('card', JSON.stringify(card))
+    if (photo) form.append('photo', photo, 'card.jpg')
+    return request('/api/collection', { method: 'POST', token, body: form })
+  },
   removeCollectionItem: (token, itemId) =>
     request(`/api/collection/${itemId}`, { method: 'DELETE', token }),
+  fetchCollectionItemPhoto: (token, itemId) => fetchBlob(`/api/collection/${itemId}/photo`, token),
 
   getMatches: (token) => request('/api/matches', { token }),
 

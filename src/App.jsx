@@ -79,8 +79,8 @@ export default function App() {
     )
   }
 
-  const addCard = async (listType, card) => {
-    await api.addCollectionItem(token, listType, card)
+  const addCard = async (listType, card, photo) => {
+    await api.addCollectionItem(token, listType, card, photo)
     await loadEverything(token)
   }
 
@@ -137,7 +137,7 @@ export default function App() {
             <HomeView account={account} haves={haves} wants={wants} matches={matches} onNavigate={setTab} />
           )}
           {tab === 'collection' && (
-            <CollectionView haves={haves} wants={wants} onAdd={addCard} onRemove={removeCard} />
+            <CollectionView haves={haves} wants={wants} onAdd={addCard} onRemove={removeCard} token={token} />
           )}
           {tab === 'matches' && (
             <MatchesView
@@ -146,6 +146,7 @@ export default function App() {
               hasWants={wants.length > 0}
               proposedAccountIds={proposedAccountIds}
               onPropose={proposeTrade}
+              token={token}
             />
           )}
           {tab === 'trades' && (

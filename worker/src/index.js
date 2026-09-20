@@ -1,7 +1,7 @@
 import { authenticate } from './auth.js'
 import { error, handleOptions } from './utils.js'
 import { createAccount, login, getMe, updateMe } from './routes/accounts.js'
-import { getCollection, addCollectionItem, deleteCollectionItem } from './routes/collection.js'
+import { getCollection, addCollectionItem, deleteCollectionItem, getCollectionItemPhoto } from './routes/collection.js'
 import { getMatches } from './routes/matches.js'
 import { proposeTrade, getTrades, respondToTrade, confirmTrade } from './routes/trades.js'
 import { requireAdmin, listUsers, deleteUser, listTrades } from './routes/admin.js'
@@ -36,6 +36,10 @@ export default {
       const itemMatch = path.match(/^\/api\/collection\/([^/]+)$/)
       if (itemMatch && request.method === 'DELETE') {
         return await deleteCollectionItem(env, account, itemMatch[1])
+      }
+      const photoMatch = path.match(/^\/api\/collection\/([^/]+)\/photo$/)
+      if (photoMatch && request.method === 'GET') {
+        return await getCollectionItemPhoto(env, account, photoMatch[1])
       }
 
       if (path === '/api/matches' && request.method === 'GET') return await getMatches(env, account)
