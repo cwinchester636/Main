@@ -4,7 +4,7 @@ import { createAccount, login, getMe, updateMe } from './routes/accounts.js'
 import { getCollection, addCollectionItem, deleteCollectionItem } from './routes/collection.js'
 import { getMatches } from './routes/matches.js'
 import { proposeTrade, getTrades, respondToTrade, confirmTrade } from './routes/trades.js'
-import { requireAdmin, listUsers, deleteUser } from './routes/admin.js'
+import { requireAdmin, listUsers, deleteUser, listTrades } from './routes/admin.js'
 
 export default {
   async fetch(request, env) {
@@ -58,6 +58,9 @@ export default {
       const adminUserMatch = path.match(/^\/api\/admin\/users\/([^/]+)$/)
       if (adminUserMatch && request.method === 'DELETE') {
         return requireAdmin(account, env) ?? (await deleteUser(env, account, adminUserMatch[1]))
+      }
+      if (path === '/api/admin/trades' && request.method === 'GET') {
+        return requireAdmin(account, env) ?? (await listTrades(env))
       }
 
       return error('not found', 404)

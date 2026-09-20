@@ -1,8 +1,22 @@
 import { error, json } from '../utils.js'
 import { isAdminUsername } from '../admin.js'
+import { deriveStatus, completedAt } from './trades.js'
 
 export function requireAdmin(account, env) {
   return isAdminUsername(account.username, env) ? null : error('admin access required', 403)
+}
+
+function serializeSnapshotCard(row) {
+  return {
+    name: row.name,
+    game: row.game,
+    set: row.set_name,
+    number: row.number,
+    rarity: row.rarity,
+    image: row.image,
+    condition: row.condition ?? null,
+    grade: row.grade ?? null,
+  }
 }
 
 // Oldest first — matches the "find old/stale accounts to clean up" use
@@ -34,13 +48,19 @@ export async function deleteUser(env, account, targetId) {
   const target = await env.DB.prepare('SELECT id FROM accounts WHERE id = ?').bind(targetId).first()
   if (!target) return error('user not found', 404)
 
-  // Explicit cascade rather than relying on collection_items/trade_proposals'
-  // ON DELETE CASCADE foreign keys actually being enforced — SQLite (and by
-  // extension D1) only enforces FK constraints when foreign_keys is turned
-  // on for the connection, which nothing in this codebase does, so this
-  // can't assume it's active.
+  // Explicit cascade rather than relying on collection_items/trade_proposals/
+  // trade_snapshot_items' ON DELETE CASCADE foreign keys actually being
+  // enforced — SQLite (and by extension D1) only enforces FK constraints
+  // when foreign_keys is turned on for the connection, which nothing in
+  // this codebase does, so this can't assume it's active. Snapshot items
+  // go first since they reference trade_proposals rows this same batch
+  // deletes right after.
   await env.DB.batch([
     env.DB.prepare('DELETE FROM collection_items WHERE account_id = ?').bind(targetId),
+    env.DB.prepare(
+      `DELETE FROM trade_snapshot_items WHERE trade_id IN
+         (SELECT id FROM trade_proposals WHERE from_account_id = ? OR to_account_id = ?)`,
+    ).bind(targetId, targetId),
     env.DB.prepare('DELETE FROM trade_proposals WHERE from_account_id = ? OR to_account_id = ?').bind(
       targetId,
       targetId,
@@ -49,4 +69,56 @@ export async function deleteUser(env, account, targetId) {
   ])
 
   return json({ deleted: targetId })
+}
+
+// Every trade any account has ever proposed, responded to, or confirmed —
+// for looking into a dispute on a user's behalf without needing their
+// login. Includes both parties' contact info and the card snapshot taken
+// at propose time (see migrations/0007_trade_snapshots.sql) so the record
+// reflects what was actually offered, even if the cards involved have
+// since been edited or removed from either collection.
+export async function listTrades(env) {
+  const trades = await env.DB.prepare(
+    `SELECT tp.*, fa.username AS from_username, fa.email AS from_email, fa.avatar AS from_avatar,
+            ta.username AS to_username, ta.email AS to_email, ta.avatar AS to_avatar
+     FROM trade_proposals tp
+     JOIN accounts fa ON fa.id = tp.from_account_id
+     JOIN accounts ta ON ta.id = tp.to_account_id
+     ORDER BY tp.created_at DESC
+     LIMIT 500`,
+  ).all()
+
+  if (trades.results.length === 0) return json({ trades: [] })
+
+  const tradeIds = trades.results.map((row) => row.id)
+  const placeholders = tradeIds.map(() => '?').join(', ')
+  const snapshots = await env.DB.prepare(
+    `SELECT * FROM trade_snapshot_items WHERE trade_id IN (${placeholders})`,
+  )
+    .bind(...tradeIds)
+    .all()
+
+  const cardsByTrade = new Map()
+  for (const row of snapshots.results) {
+    if (!cardsByTrade.has(row.trade_id)) cardsByTrade.set(row.trade_id, [])
+    cardsByTrade.get(row.trade_id).push(row)
+  }
+
+  return json({
+    trades: trades.results.map((row) => {
+      const cards = cardsByTrade.get(row.id) ?? []
+      return {
+        id: row.id,
+        status: deriveStatus(row),
+        createdAt: row.created_at,
+        fromConfirmedAt: row.from_confirmed_at,
+        toConfirmedAt: row.to_confirmed_at,
+        completedAt: completedAt(row),
+        from: { id: row.from_account_id, username: row.from_username, email: row.from_email, avatar: row.from_avatar },
+        to: { id: row.to_account_id, username: row.to_username, email: row.to_email, avatar: row.to_avatar },
+        fromOffered: cards.filter((c) => c.owner_account_id === row.from_account_id).map(serializeSnapshotCard),
+        toOffered: cards.filter((c) => c.owner_account_id === row.to_account_id).map(serializeSnapshotCard),
+      }
+    }),
+  })
 }

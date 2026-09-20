@@ -1,16 +1,63 @@
-import { error, json, newId } from '../utils.js'
+import { error, json, newId, matchKey } from '../utils.js'
 
 // "completed" isn't a stored status value — it's derived from both
 // confirmation timestamps being set on an accepted trade. See
 // migrations/0002_trade_confirmations.sql for why.
-function deriveStatus(row) {
+export function deriveStatus(row) {
   if (row.status === 'accepted' && row.from_confirmed_at && row.to_confirmed_at) return 'completed'
   return row.status
 }
 
-function completedAt(row) {
+export function completedAt(row) {
   if (!row.from_confirmed_at || !row.to_confirmed_at) return null
   return Math.max(row.from_confirmed_at, row.to_confirmed_at)
+}
+
+// What each side was offering at propose time: the from-account's haves
+// that match the to-account's wants, and vice versa — same matchKey logic
+// as matches.js, just narrowed to one specific pair instead of everyone.
+// Recomputed server-side from live collection_items rather than trusting
+// anything the client sends, since this becomes a permanent trade record.
+async function computeOfferedCards(env, fromAccountId, toAccountId) {
+  const rows = await env.DB.prepare('SELECT * FROM collection_items WHERE account_id = ? OR account_id = ?')
+    .bind(fromAccountId, toAccountId)
+    .all()
+
+  const fromHaves = [], fromWants = [], toHaves = [], toWants = []
+  for (const row of rows.results) {
+    const mine = row.account_id === fromAccountId
+    const bucket = row.list_type === 'have' ? (mine ? fromHaves : toHaves) : mine ? fromWants : toWants
+    bucket.push(row)
+  }
+
+  const toWantKeys = new Set(toWants.map((r) => matchKey(r.game, r.name)))
+  const fromWantKeys = new Set(fromWants.map((r) => matchKey(r.game, r.name)))
+
+  return {
+    fromOffers: fromHaves.filter((r) => toWantKeys.has(matchKey(r.game, r.name))),
+    toOffers: toHaves.filter((r) => fromWantKeys.has(matchKey(r.game, r.name))),
+  }
+}
+
+function snapshotInsert(env, tradeId, ownerAccountId, row, createdAt) {
+  return env.DB.prepare(
+    `INSERT INTO trade_snapshot_items
+       (id, trade_id, owner_account_id, game, name, set_name, number, rarity, image, condition, grade, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    newId(),
+    tradeId,
+    ownerAccountId,
+    row.game,
+    row.name,
+    row.set_name,
+    row.number,
+    row.rarity,
+    row.image,
+    row.condition,
+    row.grade,
+    createdAt,
+  )
 }
 
 export async function proposeTrade(request, env, account) {
@@ -31,12 +78,16 @@ export async function proposeTrade(request, env, account) {
 
   const id = newId()
   const createdAt = Date.now()
-  await env.DB.prepare(
-    `INSERT INTO trade_proposals (id, from_account_id, to_account_id, status, created_at)
-     VALUES (?, ?, ?, 'pending', ?)`,
-  )
-    .bind(id, account.id, body.toAccountId, createdAt)
-    .run()
+  const { fromOffers, toOffers } = await computeOfferedCards(env, account.id, body.toAccountId)
+
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO trade_proposals (id, from_account_id, to_account_id, status, created_at)
+       VALUES (?, ?, ?, 'pending', ?)`,
+    ).bind(id, account.id, body.toAccountId, createdAt),
+    ...fromOffers.map((row) => snapshotInsert(env, id, account.id, row, createdAt)),
+    ...toOffers.map((row) => snapshotInsert(env, id, body.toAccountId, row, createdAt)),
+  ])
 
   return json({ proposal: { id, from_account_id: account.id, to_account_id: body.toAccountId, status: 'pending', created_at: createdAt } }, 201)
 }
