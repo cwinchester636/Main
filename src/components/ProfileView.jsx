@@ -34,6 +34,9 @@ export default function ProfileView({ account, onUpdate, onLogOut }) {
       <h1>Profile</h1>
       <p className="view-subtitle">@{account.username} — this is how other collectors see you.</p>
 
+      <p className="field-label">Email</p>
+      <p className="profile-email">{account.email || 'Not set (this account predates email/password login)'}</p>
+
       <label className="field-label" htmlFor="profile-zip">ZIP code</label>
       <input
         id="profile-zip"
@@ -74,9 +77,8 @@ export default function ProfileView({ account, onUpdate, onLogOut }) {
       <div className="danger-zone">
         <h2>Log out</h2>
         <p className="section-hint">
-          Your account, collection, and trade history stay on the server — you'll just need your username again
-          to sign back in on this device. There's no password recovery yet, so this device is currently the only
-          way back in.
+          Your account, collection, and trade history stay on the server. Log back in any time with your username
+          or email and your password{account.email ? '' : " — but this account has no password set, so this device is currently the only way back in"}.
         </p>
         <button
           type="button"

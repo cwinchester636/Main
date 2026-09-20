@@ -1,6 +1,6 @@
 import { authenticate } from './auth.js'
 import { error, handleOptions } from './utils.js'
-import { createAccount, getMe, updateMe } from './routes/accounts.js'
+import { createAccount, login, getMe, updateMe } from './routes/accounts.js'
 import { getCollection, addCollectionItem, deleteCollectionItem } from './routes/collection.js'
 import { getMatches } from './routes/matches.js'
 import { proposeTrade, getTrades, respondToTrade, confirmTrade } from './routes/trades.js'
@@ -13,9 +13,12 @@ export default {
     const path = url.pathname
 
     try {
-      // Public route: creating an account is how you get a token.
+      // Public routes: these are how you get a token.
       if (path === '/api/accounts' && request.method === 'POST') {
         return await createAccount(request, env)
+      }
+      if (path === '/api/login' && request.method === 'POST') {
+        return await login(request, env)
       }
 
       // Everything past this point requires a valid bearer token.

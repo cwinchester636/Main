@@ -33,6 +33,7 @@ async function request(path, { method = 'GET', token, body } = {}) {
 
 export const api = {
   createAccount: (body) => request('/api/accounts', { method: 'POST', body }),
+  login: (body) => request('/api/login', { method: 'POST', body }),
   getMe: (token) => request('/api/me', { token }),
   updateMe: (token, body) => request('/api/me', { method: 'PATCH', token, body }),
 

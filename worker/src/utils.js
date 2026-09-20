@@ -29,10 +29,54 @@ export function generateToken() {
   return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+function bytesToHex(bytes) {
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function hexToBytes(hex) {
+  const bytes = new Uint8Array(hex.length / 2)
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16)
+  return bytes
+}
+
 export async function hashToken(token) {
   const data = new TextEncoder().encode(token)
   const digest = await crypto.subtle.digest('SHA-256', data)
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
+  return bytesToHex(new Uint8Array(digest))
+}
+
+// PBKDF2, not a plain digest — unlike the 256-bit random session token
+// above, a password has real-world-guessable entropy, so it needs a slow,
+// salted KDF rather than a fast hash. 100k iterations matches OWASP's
+// current PBKDF2-SHA256 baseline.
+const PBKDF2_ITERATIONS = 100_000
+
+export async function hashPassword(password, saltHex) {
+  const salt = saltHex ? hexToBytes(saltHex) : crypto.getRandomValues(new Uint8Array(16))
+  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, [
+    'deriveBits',
+  ])
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    keyMaterial,
+    256,
+  )
+  return { hash: bytesToHex(new Uint8Array(bits)), salt: bytesToHex(salt) }
+}
+
+// Constant-time comparison — a hash mismatch found via early-exit ===
+// leaks how many leading hex characters matched, timing-attack territory
+// for something derived from a secret.
+export function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+export async function verifyPassword(password, saltHex, expectedHashHex) {
+  const { hash } = await hashPassword(password, saltHex)
+  return timingSafeEqual(hash, expectedHashHex)
 }
 
 export function matchKey(game, name) {

@@ -345,6 +345,11 @@
   font-size: 0.82rem;
 }
 
+.profile-email {
+  font-size: 0.95rem;
+  margin: 0 0 12px;
+}
+
 .empty-hint {
   color: var(--ink-soft);
   font-size: 0.85rem;
@@ -875,6 +880,13 @@
 .onboarding-card h1 {
   margin: 0 0 6px;
   font-size: 1.4rem;
+}
+
+.auth-switch {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-top: 14px;
 }
 
 .onboarding-card > p {

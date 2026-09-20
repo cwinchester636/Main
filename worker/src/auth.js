@@ -13,5 +13,12 @@ export async function authenticate(request, env) {
 }
 
 export function publicAccount(row) {
-  return { id: row.id, username: row.username, avatar: row.avatar, zip: row.zip, radiusMiles: row.radius_miles ?? null }
+  return {
+    id: row.id,
+    username: row.username,
+    email: row.email ?? null,
+    avatar: row.avatar,
+    zip: row.zip,
+    radiusMiles: row.radius_miles ?? null,
+  }
 }
