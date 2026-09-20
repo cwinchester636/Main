@@ -19,7 +19,14 @@ export function normalizePokemonCard(raw) {
 }
 
 export async function searchPokemonCards(query, { signal } = {}) {
-  const q = encodeURIComponent(`name:"${query.replace(/"/g, '')}*"`)
+  // A wildcard wrapped in quotes (`name:"char*"`) isn't valid syntax for
+  // this API's Lucene-style query parser and reliably 500s server-side —
+  // confirmed against production. The documented form is an unquoted
+  // trailing wildcard (`name:char*`); that's a looser match for multi-word
+  // names than a quoted phrase would be, but a broader match beats a
+  // broken search.
+  const sanitized = query.replace(/["\\]/g, '').trim()
+  const q = encodeURIComponent(`name:${sanitized}*`)
   const json = await fetchJson(`${BASE_URL}?q=${q}&pageSize=20&orderBy=-set.releaseDate`, { signal })
   return (json.data ?? []).map(normalizePokemonCard)
 }

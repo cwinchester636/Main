@@ -29,11 +29,18 @@ export async function resolveCardPrice(cardId) {
 }
 
 // undefined = still loading, null = fetched but no price available,
-// {amount, currency} = resolved price.
-export function useCardPrice(cardId) {
-  const [price, setPrice] = useState(() => priceCache.get(cardId))
+// {amount, currency} = resolved price. `enabled: false` skips fetching
+// entirely rather than just hiding the result — a search results list can
+// show dozens of rows for cards the user never selects, and firing a price
+// lookup for every one of them was flooding the live APIs with individual
+// per-card requests on every keystroke (enough to get rate-limited/blocked
+// outright). Only a card that's actually been selected or saved needs its
+// price fetched.
+export function useCardPrice(cardId, { enabled = true } = {}) {
+  const [price, setPrice] = useState(() => (enabled ? priceCache.get(cardId) : undefined))
 
   useEffect(() => {
+    if (!enabled) return
     let cancelled = false
     resolveCardPrice(cardId).then((result) => {
       if (!cancelled) setPrice(result)
@@ -41,7 +48,7 @@ export function useCardPrice(cardId) {
     return () => {
       cancelled = true
     }
-  }, [cardId])
+  }, [cardId, enabled])
 
   return price
 }

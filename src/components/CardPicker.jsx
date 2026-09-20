@@ -273,7 +273,7 @@ export default function CardPicker({ title, listType, excludeIds, onAdd, onClose
                   ) : null}
                   <span className="picker-row-text">
                     <span className="picker-row-name">{card.name}</span>
-                    <CardMeta card={card} className="picker-row-set" />
+                    <CardMeta card={card} className="picker-row-set" showPrice={false} />
                   </span>
                   <span className="picker-row-add" aria-hidden="true">+</span>
                 </button>
