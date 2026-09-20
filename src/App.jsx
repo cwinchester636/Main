@@ -148,7 +148,7 @@ export default function App() {
             />
           )}
           {tab === 'trades' && (
-            <TradesView trades={trades} onRespond={respondToTrade} onConfirm={confirmTrade} />
+            <TradesView trades={trades} matches={matches} onRespond={respondToTrade} onConfirm={confirmTrade} />
           )}
           {tab === 'profile' && (
             <ProfileView account={account} onUpdate={updateProfile} onLogOut={logOut} />

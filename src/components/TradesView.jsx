@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import AvatarIcon from './AvatarIcon.jsx'
+import ValueDisparityModal from './ValueDisparityModal.jsx'
+import { checkValueDisparity } from '../utils/tradeValue.js'
 
 const STATUS_LABEL = {
   pending: 'Awaiting response',
@@ -11,8 +14,22 @@ function formatDate(ts) {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function TradeCard({ trade, direction, onRespond, onConfirm }) {
+function TradeCard({ trade, direction, match, onRespond, onConfirm }) {
   const { counterparty, status } = trade
+  const [checkingValue, setCheckingValue] = useState(false)
+  const [disparity, setDisparity] = useState(null)
+
+  const handleAcceptClick = async () => {
+    // No current match data for this counterparty (e.g. the overlapping
+    // cards have since changed) — nothing to compare, so just accept.
+    if (!match) return onRespond(trade.id, 'accept')
+
+    setCheckingValue(true)
+    const result = await checkValueDisparity(match.theyHaveYouWant, match.youHaveTheyWant)
+    setCheckingValue(false)
+    if (result?.imbalanced) setDisparity(result)
+    else onRespond(trade.id, 'accept')
+  }
 
   return (
     <div className={`trade-card trade-${status}`}>
@@ -26,8 +43,8 @@ function TradeCard({ trade, direction, onRespond, onConfirm }) {
 
       {status === 'pending' && direction === 'received' && (
         <div className="trade-actions">
-          <button type="button" className="button primary" onClick={() => onRespond(trade.id, 'accept')}>
-            Accept
+          <button type="button" className="button primary" disabled={checkingValue} onClick={handleAcceptClick}>
+            {checkingValue ? 'Checking card values…' : 'Accept'}
           </button>
           <button type="button" className="button secondary" onClick={() => onRespond(trade.id, 'decline')}>
             Decline
@@ -56,13 +73,29 @@ function TradeCard({ trade, direction, onRespond, onConfirm }) {
           ✓ Verified by both sides{trade.completedAt ? ` on ${formatDate(trade.completedAt)}` : ''}.
         </p>
       )}
+
+      {disparity && (
+        <ValueDisparityModal
+          theirLabel={`${counterparty.username}'s cards`}
+          yourLabel="Your cards"
+          theirValue={disparity.theirValue}
+          yourValue={disparity.yourValue}
+          disparity={disparity.disparity}
+          onCancel={() => setDisparity(null)}
+          onConfirm={() => {
+            setDisparity(null)
+            onRespond(trade.id, 'accept')
+          }}
+        />
+      )}
     </div>
   )
 }
 
-export default function TradesView({ trades, onRespond, onConfirm }) {
+export default function TradesView({ trades, matches, onRespond, onConfirm }) {
   const { sent, received } = trades
   const hasAny = sent.length > 0 || received.length > 0
+  const matchByAccountId = (accountId) => matches.find((m) => m.account.id === accountId)
 
   if (!hasAny) {
     return (
@@ -86,7 +119,14 @@ export default function TradesView({ trades, onRespond, onConfirm }) {
           <h2>Received</h2>
           <div className="trade-list">
             {received.map((trade) => (
-              <TradeCard key={trade.id} trade={trade} direction="received" onRespond={onRespond} onConfirm={onConfirm} />
+              <TradeCard
+                key={trade.id}
+                trade={trade}
+                direction="received"
+                match={matchByAccountId(trade.counterparty.id)}
+                onRespond={onRespond}
+                onConfirm={onConfirm}
+              />
             ))}
           </div>
         </section>
@@ -97,7 +137,14 @@ export default function TradesView({ trades, onRespond, onConfirm }) {
           <h2>Sent</h2>
           <div className="trade-list">
             {sent.map((trade) => (
-              <TradeCard key={trade.id} trade={trade} direction="sent" onRespond={onRespond} onConfirm={onConfirm} />
+              <TradeCard
+                key={trade.id}
+                trade={trade}
+                direction="sent"
+                match={matchByAccountId(trade.counterparty.id)}
+                onRespond={onRespond}
+                onConfirm={onConfirm}
+              />
             ))}
           </div>
         </section>

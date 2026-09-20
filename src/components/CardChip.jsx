@@ -2,11 +2,9 @@ import { useState } from 'react'
 import { GAMES } from '../data/cards.js'
 import { CONDITION_LABEL } from '../data/conditions.js'
 import { useCardPrice } from '../hooks/useCardPrice.js'
+import { formatUSD } from '../utils/currency.js'
 
 const gameEmoji = (gameId) => GAMES.find((g) => g.id === gameId)?.emoji ?? '🃏'
-
-const formatPrice = (amount) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
 
 function conditionText(card) {
   if (!card.condition) return null
@@ -40,7 +38,7 @@ export default function CardChip({ card, onRemove, compact = false }) {
         <span className="card-chip-name">{card.name}</span>
         <span className="card-chip-set">
           {card.set} · {card.number}
-          {price && <span className="card-chip-price"> · {formatPrice(price.amount)}</span>}
+          {price && <span className="card-chip-price"> · {formatUSD(price.amount)}</span>}
         </span>
         {condition && <span className="card-chip-condition">{condition}</span>}
       </span>

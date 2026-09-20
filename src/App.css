@@ -777,6 +777,20 @@
   font-weight: 600;
 }
 
+/* Value disparity warning */
+.disparity-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.disparity-row:last-of-type {
+  border-bottom: none;
+}
+
 /* Profile */
 .avatar-picker {
   margin-bottom: 12px;

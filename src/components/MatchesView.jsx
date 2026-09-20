@@ -1,13 +1,31 @@
 import { useState } from 'react'
 import CardChip from './CardChip.jsx'
 import AvatarIcon from './AvatarIcon.jsx'
+import ValueDisparityModal from './ValueDisparityModal.jsx'
 import { distanceLabel } from '../utils/distance.js'
+import { checkValueDisparity } from '../utils/tradeValue.js'
 
 function MatchCard({ match, isProposed, onPropose }) {
   const [open, setOpen] = useState(false)
   const [proposing, setProposing] = useState(false)
+  const [checkingValue, setCheckingValue] = useState(false)
+  const [disparity, setDisparity] = useState(null)
   const { account, theyHaveYouWant, youHaveTheyWant, isMutual } = match
   const proximityLabel = distanceLabel(match)
+
+  const doPropose = async () => {
+    setProposing(true)
+    await onPropose(account.id)
+    setProposing(false)
+  }
+
+  const handleProposeClick = async () => {
+    setCheckingValue(true)
+    const result = await checkValueDisparity(theyHaveYouWant, youHaveTheyWant)
+    setCheckingValue(false)
+    if (result?.imbalanced) setDisparity(result)
+    else await doPropose()
+  }
 
   return (
     <div className={`match-card${isMutual ? ' mutual' : ''}`}>
@@ -51,16 +69,31 @@ function MatchCard({ match, isProposed, onPropose }) {
           <button
             type="button"
             className={`button ${isProposed ? 'secondary' : 'primary'} full`}
-            disabled={isProposed || proposing}
-            onClick={async () => {
-              setProposing(true)
-              await onPropose(account.id)
-              setProposing(false)
-            }}
+            disabled={isProposed || proposing || checkingValue}
+            onClick={handleProposeClick}
           >
-            {isProposed ? '✓ Trade in progress — see Trades tab' : `Propose trade to ${account.username}`}
+            {isProposed
+              ? '✓ Trade in progress — see Trades tab'
+              : checkingValue
+                ? 'Checking card values…'
+                : `Propose trade to ${account.username}`}
           </button>
         </div>
+      )}
+
+      {disparity && (
+        <ValueDisparityModal
+          theirLabel={`${account.username}'s cards`}
+          yourLabel="Your cards"
+          theirValue={disparity.theirValue}
+          yourValue={disparity.yourValue}
+          disparity={disparity.disparity}
+          onCancel={() => setDisparity(null)}
+          onConfirm={async () => {
+            setDisparity(null)
+            await doPropose()
+          }}
+        />
       )}
     </div>
   )
