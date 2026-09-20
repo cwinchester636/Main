@@ -52,4 +52,7 @@ export const api = {
     request(`/api/trades/${tradeId}`, { method: 'PATCH', token, body: { action } }),
   confirmTrade: (token, tradeId) =>
     request(`/api/trades/${tradeId}/confirm`, { method: 'POST', token }),
+
+  adminListUsers: (token) => request('/api/admin/users', { token }),
+  adminDeleteUser: (token, userId) => request(`/api/admin/users/${userId}`, { method: 'DELETE', token }),
 }

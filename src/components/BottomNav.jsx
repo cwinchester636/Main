@@ -5,13 +5,15 @@ const TABS = [
   { id: 'trades', label: 'Trades', emoji: '🔄' },
   { id: 'profile', label: 'Profile', emoji: '👤' },
 ]
+const ADMIN_TAB = { id: 'admin', label: 'Admin', emoji: '🛠️' }
 
-export default function BottomNav({ active, onChange, matchBadge, tradeBadge }) {
+export default function BottomNav({ active, onChange, matchBadge, tradeBadge, showAdmin }) {
   const badges = { matches: matchBadge, trades: tradeBadge }
+  const tabs = showAdmin ? [...TABS, ADMIN_TAB] : TABS
 
   return (
     <nav className="bottom-nav" aria-label="Main navigation">
-      {TABS.map((tab) => (
+      {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"

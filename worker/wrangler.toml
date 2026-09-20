@@ -7,3 +7,11 @@ binding = "DB"
 database_name = "swapdeck"
 database_id = "30d86cca-a44d-4300-84e1-2bf9f7dfdc12"
 migrations_dir = "migrations"
+
+[vars]
+# Comma-separated usernames with access to the Admin tab (list/delete any
+# account). Not a secret — this is a plain wrangler.toml var, checked into
+# git, not a runtime-settable value — so changing it always goes through a
+# real code review + deploy, never a silent database write. See
+# worker/src/admin.js.
+ADMIN_USERNAMES = ""

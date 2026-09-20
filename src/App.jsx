@@ -7,6 +7,7 @@ import HomeView from './components/HomeView.jsx'
 import CollectionView from './components/CollectionView.jsx'
 import MatchesView from './components/MatchesView.jsx'
 import TradesView from './components/TradesView.jsx'
+import AdminView from './components/AdminView.jsx'
 import ProfileView from './components/ProfileView.jsx'
 import './App.css'
 
@@ -150,6 +151,9 @@ export default function App() {
           {tab === 'trades' && (
             <TradesView trades={trades} matches={matches} onRespond={respondToTrade} onConfirm={confirmTrade} />
           )}
+          {tab === 'admin' && account.isAdmin && (
+            <AdminView token={token} currentAccountId={account.id} />
+          )}
           {tab === 'profile' && (
             <ProfileView account={account} onUpdate={updateProfile} onLogOut={logOut} />
           )}
@@ -159,6 +163,7 @@ export default function App() {
           onChange={setTab}
           matchBadge={matches.filter((m) => m.isMutual).length}
           tradeBadge={tradeBadge}
+          showAdmin={account.isAdmin}
         />
       </div>
     </div>

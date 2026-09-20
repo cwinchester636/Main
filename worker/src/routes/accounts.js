@@ -1,6 +1,7 @@
 import { error, json, newId, generateToken, hashToken, hashPassword, verifyPassword } from '../utils.js'
 import { publicAccount } from '../auth.js'
 import { geocodeZip } from '../geocode.js'
+import { isAdminUsername } from '../admin.js'
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/
 // Deliberately permissive — this only rejects obviously-malformed input
@@ -76,7 +77,7 @@ export async function createAccount(request, env) {
     )
     .run()
 
-  return json({ account: { id, username, email, avatar, zip, radiusMiles }, token }, 201)
+  return json({ account: { id, username, email, avatar, zip, radiusMiles, isAdmin: isAdminUsername(username, env) }, token }, 201)
 }
 
 // Logging in issues a *new* token and overwrites the account's stored one
@@ -105,11 +106,11 @@ export async function login(request, env) {
   const tokenHash = await hashToken(token)
   await env.DB.prepare('UPDATE accounts SET token_hash = ? WHERE id = ?').bind(tokenHash, row.id).run()
 
-  return json({ account: publicAccount(row), token })
+  return json({ account: { ...publicAccount(row), isAdmin: isAdminUsername(row.username, env) }, token })
 }
 
-export function getMe(account) {
-  return json({ account: publicAccount(account) })
+export function getMe(account, env) {
+  return json({ account: { ...publicAccount(account), isAdmin: isAdminUsername(account.username, env) } })
 }
 
 export async function updateMe(request, env, account) {
@@ -130,5 +131,15 @@ export async function updateMe(request, env, account) {
     .bind(avatar, zip, coords?.lat ?? null, coords?.lng ?? null, radiusMiles, account.id)
     .run()
 
-  return json({ account: { id: account.id, username: account.username, email: account.email, avatar, zip, radiusMiles } })
+  return json({
+    account: {
+      id: account.id,
+      username: account.username,
+      email: account.email,
+      avatar,
+      zip,
+      radiusMiles,
+      isAdmin: isAdminUsername(account.username, env),
+    },
+  })
 }

@@ -4,6 +4,7 @@ import { createAccount, login, getMe, updateMe } from './routes/accounts.js'
 import { getCollection, addCollectionItem, deleteCollectionItem } from './routes/collection.js'
 import { getMatches } from './routes/matches.js'
 import { proposeTrade, getTrades, respondToTrade, confirmTrade } from './routes/trades.js'
+import { requireAdmin, listUsers, deleteUser } from './routes/admin.js'
 
 export default {
   async fetch(request, env) {
@@ -25,7 +26,7 @@ export default {
       const account = await authenticate(request, env)
       if (!account) return error('unauthorized', 401)
 
-      if (path === '/api/me' && request.method === 'GET') return getMe(account)
+      if (path === '/api/me' && request.method === 'GET') return getMe(account, env)
       if (path === '/api/me' && request.method === 'PATCH') return await updateMe(request, env, account)
 
       if (path === '/api/collection' && request.method === 'GET') return await getCollection(env, account)
@@ -49,6 +50,14 @@ export default {
       const confirmMatch = path.match(/^\/api\/trades\/([^/]+)\/confirm$/)
       if (confirmMatch && request.method === 'POST') {
         return await confirmTrade(env, account, confirmMatch[1])
+      }
+
+      if (path === '/api/admin/users' && request.method === 'GET') {
+        return requireAdmin(account, env) ?? (await listUsers(env))
+      }
+      const adminUserMatch = path.match(/^\/api\/admin\/users\/([^/]+)$/)
+      if (adminUserMatch && request.method === 'DELETE') {
+        return requireAdmin(account, env) ?? (await deleteUser(env, account, adminUserMatch[1]))
       }
 
       return error('not found', 404)
