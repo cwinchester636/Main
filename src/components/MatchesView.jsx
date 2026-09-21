@@ -5,6 +5,7 @@ import ValueDisparityModal from './ValueDisparityModal.jsx'
 import PhotoViewerModal from './PhotoViewerModal.jsx'
 import CashInput from './CashInput.jsx'
 import RatingBadge from './RatingBadge.jsx'
+import RatingsListModal from './RatingsListModal.jsx'
 import { distanceLabel } from '../utils/distance.js'
 import { checkValueDisparity } from '../utils/tradeValue.js'
 
@@ -14,6 +15,7 @@ function MatchCard({ match, isProposed, onPropose, token, isSuspended }) {
   const [checkingValue, setCheckingValue] = useState(false)
   const [disparity, setDisparity] = useState(null)
   const [viewingPhotoId, setViewingPhotoId] = useState(null)
+  const [viewingRatings, setViewingRatings] = useState(false)
   const [cashInput, setCashInput] = useState('')
   const { account, theyHaveYouWant, youHaveTheyWant, isMutual } = match
   const proximityLabel = distanceLabel(match)
@@ -52,6 +54,12 @@ function MatchCard({ match, isProposed, onPropose, token, isSuspended }) {
 
       {open && (
         <div className="match-detail">
+          {account.rating?.count > 0 && (
+            <p className="section-hint">
+              <RatingBadge rating={account.rating} onClick={() => setViewingRatings(true)} /> — tap to read reviews
+            </p>
+          )}
+
           {theyHaveYouWant.length > 0 && (
             <div className="match-detail-col">
               <h3>They have (you want)</h3>
@@ -122,6 +130,15 @@ function MatchCard({ match, isProposed, onPropose, token, isSuspended }) {
 
       {viewingPhotoId && (
         <PhotoViewerModal token={token} itemId={viewingPhotoId} onClose={() => setViewingPhotoId(null)} />
+      )}
+
+      {viewingRatings && (
+        <RatingsListModal
+          token={token}
+          accountId={account.id}
+          username={account.username}
+          onClose={() => setViewingRatings(false)}
+        />
       )}
     </div>
   )

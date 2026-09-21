@@ -6,6 +6,7 @@ import TradeChatModal from './TradeChatModal.jsx'
 import ReportTradeModal from './ReportTradeModal.jsx'
 import RateTradeModal from './RateTradeModal.jsx'
 import RatingBadge from './RatingBadge.jsx'
+import RatingsListModal from './RatingsListModal.jsx'
 import { checkValueDisparity } from '../utils/tradeValue.js'
 import { formatUSD } from '../utils/currency.js'
 
@@ -32,6 +33,7 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
   const [reportSubmitted, setReportSubmitted] = useState(false)
   const [rateOpen, setRateOpen] = useState(false)
   const [myRating, setMyRating] = useState(trade.myRating)
+  const [viewingRatings, setViewingRatings] = useState(false)
   const cashAmount = Number(cashInput) || 0
 
   const handleAcceptClick = async () => {
@@ -56,7 +58,7 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
         <span className="trade-summary-text">
           <span className="match-name-row">
             <strong>{counterparty.username}</strong>
-            <RatingBadge rating={counterparty.rating} />
+            <RatingBadge rating={counterparty.rating} onClick={() => setViewingRatings(true)} />
           </span>
           <span className={`trade-status-badge status-${status}`}>{STATUS_LABEL[status]}</span>
         </span>
@@ -181,6 +183,15 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
             setDisparity(null)
             onRespond(trade.id, 'accept', cashAmount)
           }}
+        />
+      )}
+
+      {viewingRatings && (
+        <RatingsListModal
+          token={token}
+          accountId={counterparty.id}
+          username={counterparty.username}
+          onClose={() => setViewingRatings(false)}
         />
       )}
     </div>

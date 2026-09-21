@@ -1,5 +1,6 @@
 import { error, json, newId, matchKey, servePhoto } from '../utils.js'
 import { isAdminUsername } from '../admin.js'
+import { notifyNewMatches } from './matchAlerts.js'
 
 // Kept in sync with src/data/conditions.js (the frontend can't import
 // across the worker/ boundary, so this is intentionally duplicated —
@@ -55,7 +56,7 @@ export async function getCollection(env, account) {
 // verification photo in the same request: { listType, card (JSON string),
 // photo? (File) }. 'want' items never take a photo — wanting a card isn't a
 // possession claim, nothing to verify.
-export async function addCollectionItem(request, env, account) {
+export async function addCollectionItem(request, env, account, ctx) {
   const form = await request.formData().catch(() => null)
   if (!form) return error('malformed request')
 
@@ -115,6 +116,8 @@ export async function addCollectionItem(request, env, account) {
       Date.now(),
     )
     .run()
+
+  ctx?.waitUntil(notifyNewMatches(env, account))
 
   return json(
     {

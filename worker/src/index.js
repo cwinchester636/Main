@@ -7,7 +7,7 @@ import { proposeTrade, getTrades, respondToTrade, confirmTrade } from './routes/
 import { requireAdmin, listUsers, deleteUser, listTrades, getTradeSnapshotPhoto, setUserSuspended } from './routes/admin.js'
 import { getMessages, sendMessage } from './routes/messages.js'
 import { createReport, adminListReports, adminResolveReport } from './routes/reports.js'
-import { rateTrade } from './routes/ratings.js'
+import { rateTrade, getRatingsForAccount } from './routes/ratings.js'
 import { subscribe, unsubscribe } from './push.js'
 
 export default {
@@ -35,7 +35,7 @@ export default {
 
       if (path === '/api/collection' && request.method === 'GET') return await getCollection(env, account)
       if (path === '/api/collection' && request.method === 'POST') {
-        return await addCollectionItem(request, env, account)
+        return await addCollectionItem(request, env, account, ctx)
       }
       const itemMatch = path.match(/^\/api\/collection\/([^/]+)$/)
       if (itemMatch && request.method === 'DELETE') {
@@ -74,6 +74,11 @@ export default {
       const ratingMatch = path.match(/^\/api\/trades\/([^/]+)\/rating$/)
       if (ratingMatch && request.method === 'POST') {
         return await rateTrade(request, env, account, ratingMatch[1])
+      }
+
+      const accountRatingsMatch = path.match(/^\/api\/accounts\/([^/]+)\/ratings$/)
+      if (accountRatingsMatch && request.method === 'GET') {
+        return await getRatingsForAccount(env, accountRatingsMatch[1])
       }
 
       if (path === '/api/push/subscribe' && request.method === 'POST') {

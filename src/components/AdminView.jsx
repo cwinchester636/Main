@@ -4,6 +4,7 @@ import CardChip from './CardChip.jsx'
 import PhotoViewerModal from './PhotoViewerModal.jsx'
 import TradeChatModal from './TradeChatModal.jsx'
 import RatingBadge from './RatingBadge.jsx'
+import RatingsListModal from './RatingsListModal.jsx'
 import { api, ApiError } from '../api/client.js'
 import { formatUSD } from '../utils/currency.js'
 
@@ -37,6 +38,7 @@ function AdminUsers({ token, currentAccountId }) {
   const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState(null)
   const [suspendingId, setSuspendingId] = useState(null)
+  const [viewingRatingsFor, setViewingRatingsFor] = useState(null)
 
   const load = async () => {
     try {
@@ -111,7 +113,7 @@ function AdminUsers({ token, currentAccountId }) {
                   {user.isSuspended && <span className="trade-status-badge status-declined">Suspended</span>}
                 </span>
                 <span className="section-hint">{user.email || 'no email'} · joined {formatDate(user.createdAt)}</span>
-                <RatingBadge rating={user.rating} />
+                <RatingBadge rating={user.rating} onClick={() => setViewingRatingsFor(user)} />
               </span>
               {user.id === currentAccountId ? (
                 <span className="admin-user-you">you</span>
@@ -139,6 +141,15 @@ function AdminUsers({ token, currentAccountId }) {
           ))}
         </div>
       )}
+
+      {viewingRatingsFor && (
+        <RatingsListModal
+          token={token}
+          accountId={viewingRatingsFor.id}
+          username={viewingRatingsFor.username}
+          onClose={() => setViewingRatingsFor(null)}
+        />
+      )}
     </>
   )
 }
@@ -146,6 +157,7 @@ function AdminUsers({ token, currentAccountId }) {
 function AdminTradeCard({ trade, token }) {
   const { status } = trade
   const [viewingPhotoId, setViewingPhotoId] = useState(null)
+  const [viewingRatingsFor, setViewingRatingsFor] = useState(null)
 
   return (
     <div className={`trade-card admin-trade-card trade-${status}`}>
@@ -157,10 +169,10 @@ function AdminTradeCard({ trade, token }) {
       </div>
 
       <p className="section-hint">
-        <RatingBadge rating={trade.from.rating} />
+        <RatingBadge rating={trade.from.rating} onClick={() => setViewingRatingsFor(trade.from)} />
         {trade.from.isSuspended && <span className="trade-status-badge status-declined">Suspended</span>}
         {' vs '}
-        <RatingBadge rating={trade.to.rating} />
+        <RatingBadge rating={trade.to.rating} onClick={() => setViewingRatingsFor(trade.to)} />
         {trade.to.isSuspended && <span className="trade-status-badge status-declined">Suspended</span>}
       </p>
 
@@ -217,6 +229,15 @@ function AdminTradeCard({ trade, token }) {
           itemId={viewingPhotoId}
           fetcher={api.adminFetchTradePhoto}
           onClose={() => setViewingPhotoId(null)}
+        />
+      )}
+
+      {viewingRatingsFor && (
+        <RatingsListModal
+          token={token}
+          accountId={viewingRatingsFor.id}
+          username={viewingRatingsFor.username}
+          onClose={() => setViewingRatingsFor(null)}
         />
       )}
     </div>

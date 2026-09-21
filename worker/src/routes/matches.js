@@ -17,7 +17,11 @@ function serializeCard(row) {
   }
 }
 
-export async function getMatches(env, account) {
+// Split from getMatches so worker/src/routes/matchAlerts.js can reuse the
+// exact same "what counts as a match" logic to detect a brand-new one,
+// rather than a second, subtly-different implementation drifting out of
+// sync with this one.
+export async function computeMatches(env, account) {
   const mine = await env.DB.prepare('SELECT * FROM collection_items WHERE account_id = ?')
     .bind(account.id)
     .all()
@@ -26,7 +30,7 @@ export async function getMatches(env, account) {
   const myWantKeys = new Set(myWants.map((r) => matchKey(r.game, r.name)))
   const myHaveKeys = new Set(myHaves.map((r) => matchKey(r.game, r.name)))
 
-  if (myHaveKeys.size === 0 && myWantKeys.size === 0) return json({ matches: [] })
+  if (myHaveKeys.size === 0 && myWantKeys.size === 0) return []
 
   // A suspended account can't complete a trade with anyone (see
   // requireNotSuspended), so it never shows up as a potential match —
@@ -99,5 +103,10 @@ export async function getMatches(env, account) {
       return a.proximity - b.proximity
     })
 
+  return matches
+}
+
+export async function getMatches(env, account) {
+  const matches = await computeMatches(env, account)
   return json({ matches })
 }

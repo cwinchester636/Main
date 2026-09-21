@@ -83,6 +83,7 @@ export const api = {
     request(`/api/trades/${tradeId}/report`, { method: 'POST', token, body: report }),
   rateTrade: (token, tradeId, thumbsUp, comment) =>
     request(`/api/trades/${tradeId}/rating`, { method: 'POST', token, body: { thumbsUp, comment } }),
+  getAccountRatings: (token, accountId) => request(`/api/accounts/${accountId}/ratings`, { token }),
 
   adminListUsers: (token) => request('/api/admin/users', { token }),
   adminDeleteUser: (token, userId) => request(`/api/admin/users/${userId}`, { method: 'DELETE', token }),

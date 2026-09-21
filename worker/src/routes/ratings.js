@@ -34,6 +34,34 @@ export async function getRatingSummary(env, accountId) {
   return summaries.get(accountId) ?? { positivePct: null, count: 0 }
 }
 
+// The full list behind a rating percentage — anyone authenticated can pull
+// this for any account, same visibility as the percentage itself
+// (RatingBadge everywhere already shows it as "visible on X's profile to
+// help other collectors decide who to trade with"; the comments are the
+// substance behind that number). Includes the rater's username rather than
+// showing anonymous feedback — attributable reviews are harder to fake,
+// same trade-off eBay/Airbnb-style feedback makes.
+export async function getRatingsForAccount(env, accountId) {
+  const rows = await env.DB.prepare(
+    `SELECT tr.thumbs_up, tr.comment, tr.created_at, a.username AS rater_username
+     FROM trade_ratings tr
+     JOIN accounts a ON a.id = tr.rater_account_id
+     WHERE tr.rated_account_id = ?
+     ORDER BY tr.created_at DESC`,
+  )
+    .bind(accountId)
+    .all()
+
+  return json({
+    ratings: rows.results.map((row) => ({
+      thumbsUp: !!row.thumbs_up,
+      comment: row.comment,
+      createdAt: row.created_at,
+      raterUsername: row.rater_username,
+    })),
+  })
+}
+
 // Either participant can rate the other, but only once the trade has
 // actually completed — a rating is a verdict on how the trade went, not a
 // prediction. rated_account_id is derived from the trade itself (whichever

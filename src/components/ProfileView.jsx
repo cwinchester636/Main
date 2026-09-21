@@ -137,8 +137,8 @@ export default function ProfileView({ account, token, onUpdate, onLogOut }) {
         {pushState === 'off' && (
           <>
             <p className="section-hint">
-              Get notified about new trade proposals, accepted trades, completed trades, and new messages — even
-              when SwapDeck isn't open.
+              Get notified about new matches, new trade proposals, accepted trades, completed trades, and new
+              messages — even when SwapDeck isn't open.
             </p>
             <button type="button" className="button secondary" disabled={pushBusy} onClick={handleEnablePush}>
               {pushBusy ? 'Enabling…' : 'Enable notifications'}
