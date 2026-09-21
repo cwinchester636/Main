@@ -51,11 +51,13 @@ export async function notifyNewMatches(env, account) {
           title: 'New match',
           body: `${m.account.username} matches your list`,
           tag: `match-${m.account.id}`,
+          linkTab: 'matches',
         }),
         notifyAccount(env, m.account.id, {
           title: 'New match',
           body: `${account.username} matches your list`,
           tag: `match-${account.id}`,
+          linkTab: 'matches',
         }),
       ]),
     )

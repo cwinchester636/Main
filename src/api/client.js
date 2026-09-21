@@ -102,4 +102,8 @@ export const api = {
   getEvents: (token) => request('/api/events', { token }),
   createEvent: (token, event) => request('/api/events', { method: 'POST', token, body: event }),
   deleteEvent: (token, eventId) => request(`/api/events/${eventId}`, { method: 'DELETE', token }),
+  rsvpToEvent: (token, eventId) => request(`/api/events/${eventId}/rsvp`, { method: 'POST', token }),
+
+  getNotifications: (token) => request('/api/notifications', { token }),
+  markNotificationsRead: (token) => request('/api/notifications/read', { method: 'PATCH', token }),
 }

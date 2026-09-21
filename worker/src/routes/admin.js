@@ -82,22 +82,33 @@ export async function deleteUser(env, account, targetId) {
 
   // Explicit cascade rather than relying on collection_items/trade_proposals/
   // trade_snapshot_items/trade_messages/trade_reports/trade_ratings/
-  // push_subscriptions/known_matches/local_events' ON DELETE CASCADE
-  // foreign keys actually being enforced — SQLite (and by extension D1)
-  // only enforces FK constraints when foreign_keys is turned on for the
-  // connection, which nothing in this codebase does, so this can't assume
-  // it's active. Everything trade_id-scoped goes first since it
-  // references trade_proposals rows this same batch deletes right after —
-  // scoping by "any trade this account was ever a party to" also
-  // correctly covers every message/report/rating they were involved in,
-  // since a rating's rater and rated account are always the trade's two
-  // participants, same as messages/reports only ever happening on your
-  // own trade.
+  // push_subscriptions/known_matches/local_events/notifications/event_rsvps'
+  // ON DELETE CASCADE foreign keys actually being enforced — SQLite (and
+  // by extension D1) only enforces FK constraints when foreign_keys is
+  // turned on for the connection, which nothing in this codebase does, so
+  // this can't assume it's active. Everything trade_id-scoped goes first
+  // since it references trade_proposals rows this same batch deletes
+  // right after — scoping by "any trade this account was ever a party to"
+  // also correctly covers every message/report/rating they were involved
+  // in, since a rating's rater and rated account are always the trade's
+  // two participants, same as messages/reports only ever happening on
+  // your own trade. event_rsvps is deleted two ways for the same reason:
+  // this account's own RSVPs to anyone's events, and (before local_events
+  // itself is deleted, since D1 batches run sequentially in one
+  // transaction) every RSVP anyone else left on an event *this* account
+  // created — otherwise those would be orphaned the moment the event row
+  // under them disappears.
   await env.DB.batch([
     env.DB.prepare('DELETE FROM collection_items WHERE account_id = ?').bind(targetId),
     env.DB.prepare('DELETE FROM push_subscriptions WHERE account_id = ?').bind(targetId),
     env.DB.prepare('DELETE FROM known_matches WHERE account_id_a = ? OR account_id_b = ?').bind(targetId, targetId),
+    env.DB.prepare('DELETE FROM event_rsvps WHERE account_id = ?').bind(targetId),
+    env.DB.prepare(
+      `DELETE FROM event_rsvps WHERE event_id IN
+         (SELECT id FROM local_events WHERE created_by_account_id = ?)`,
+    ).bind(targetId),
     env.DB.prepare('DELETE FROM local_events WHERE created_by_account_id = ?').bind(targetId),
+    env.DB.prepare('DELETE FROM notifications WHERE account_id = ?').bind(targetId),
     env.DB.prepare(
       `DELETE FROM trade_snapshot_items WHERE trade_id IN
          (SELECT id FROM trade_proposals WHERE from_account_id = ? OR to_account_id = ?)`,

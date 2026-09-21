@@ -8,6 +8,7 @@ import CollectionView from './components/CollectionView.jsx'
 import MatchesView from './components/MatchesView.jsx'
 import TradesView from './components/TradesView.jsx'
 import EventsView from './components/EventsView.jsx'
+import NotificationsModal from './components/NotificationsModal.jsx'
 import AdminView from './components/AdminView.jsx'
 import ProfileView from './components/ProfileView.jsx'
 import './App.css'
@@ -21,22 +22,28 @@ export default function App() {
   const [matches, setMatches] = useState([])
   const [trades, setTrades] = useState({ sent: [], received: [] })
   const [events, setEvents] = useState([])
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [globalError, setGlobalError] = useState('')
   const [tab, setTab] = useState('home')
 
   const loadEverything = useCallback(async (activeToken) => {
     try {
-      const [collection, matchData, tradeData, eventData] = await Promise.all([
+      const [collection, matchData, tradeData, eventData, notificationData] = await Promise.all([
         api.getCollection(activeToken),
         api.getMatches(activeToken),
         api.getTrades(activeToken),
         api.getEvents(activeToken),
+        api.getNotifications(activeToken),
       ])
       setHaves(collection.haves)
       setWants(collection.wants)
       setMatches(matchData.matches)
       setTrades(tradeData)
       setEvents(eventData.events)
+      setNotifications(notificationData.notifications)
+      setUnreadCount(notificationData.unreadCount)
       setGlobalError('')
     } catch (err) {
       setGlobalError(err instanceof ApiError ? err.message : 'Something went wrong loading your data.')
@@ -135,6 +142,17 @@ export default function App() {
     setEvents((prev) => prev.filter((e) => e.id !== eventId))
   }
 
+  // Opening the inbox is treated as "seen" for the whole list, same as most
+  // notification inboxes — see worker/src/routes/notifications.js
+  // markNotificationsRead. The badge clears immediately rather than waiting
+  // for a round trip; the mark-read call still happens, it just doesn't
+  // block the UI from feeling instant.
+  const openNotifications = () => {
+    setNotificationsOpen(true)
+    setUnreadCount(0)
+    api.markNotificationsRead(token).catch(() => {})
+  }
+
   const proposedAccountIds = trades.sent
     .filter((t) => t.status === 'pending' || t.status === 'accepted' || t.status === 'completed')
     .map((t) => t.counterparty.id)
@@ -143,6 +161,12 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="app-frame">
+        <div className="app-header">
+          <button type="button" className="bell-button" onClick={openNotifications} aria-label="Notifications">
+            🔔
+            {unreadCount > 0 && <span className="nav-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+          </button>
+        </div>
         {globalError && (
           <div className="global-error">
             {globalError}
@@ -209,6 +233,14 @@ export default function App() {
           showAdmin={account.isAdmin}
         />
       </div>
+
+      {notificationsOpen && (
+        <NotificationsModal
+          notifications={notifications}
+          onClose={() => setNotificationsOpen(false)}
+          onNavigate={setTab}
+        />
+      )}
     </div>
   )
 }

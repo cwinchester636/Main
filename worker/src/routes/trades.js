@@ -135,6 +135,7 @@ export async function proposeTrade(request, env, account, ctx) {
       title: 'New trade proposal',
       body: `${account.username} wants to trade with you`,
       tag: `trade-${id}`,
+      linkTab: 'trades',
     }),
   )
 
@@ -249,6 +250,7 @@ export async function respondToTrade(request, env, account, tradeId, ctx) {
         title: 'Trade accepted',
         body: `${account.username} accepted your trade proposal`,
         tag: `trade-${tradeId}`,
+        linkTab: 'trades',
       }),
     )
   }
@@ -289,6 +291,7 @@ export async function confirmTrade(env, account, tradeId, ctx) {
         title: 'Trade completed',
         body: `Your trade with ${account.username} is confirmed — rate it!`,
         tag: `trade-${tradeId}`,
+        linkTab: 'trades',
       }),
     )
   }

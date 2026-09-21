@@ -81,6 +81,7 @@ export async function sendMessage(request, env, account, tradeId, ctx) {
       title: `New message from ${account.username}`,
       body: text.length > NOTIFICATION_PREVIEW_LENGTH ? `${text.slice(0, NOTIFICATION_PREVIEW_LENGTH)}…` : text,
       tag: `trade-${tradeId}`,
+      linkTab: 'trades',
     }),
   )
 

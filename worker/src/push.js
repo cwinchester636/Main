@@ -44,14 +44,33 @@ export async function unsubscribe(request, env, account) {
   return json({ unsubscribed: true })
 }
 
-// Fire-and-forget notify for one account across every browser they've
-// subscribed from. A 404/410 from the push service means that endpoint is
-// gone for good (uninstalled, permission revoked, etc. -- RFC 8030 §7.3),
-// so that row is deleted rather than left to fail forever on every future
-// trigger. Every other outcome (including a network error) is just logged
-// -- one broken subscription, or the whole push service being unreachable,
-// must never take down the trade/message/rating action that triggered it.
-export async function notifyAccount(env, accountId, { title, body, tag }) {
+// Fire-and-forget notify for one account: always records an in-app
+// notification (see migrations/0016_notifications.sql) so there's
+// somewhere to see it even without push enabled, a missed/denied
+// permission, or a push send that silently failed -- then, independently,
+// tries to push it to every browser they've subscribed from. linkTab, when
+// given, is which bottom-nav tab tapping the notification should open
+// (NotificationsModal.jsx) -- optional since not every notification needs
+// to go anywhere in particular.
+//
+// A 404/410 from the push service means that endpoint is gone for good
+// (uninstalled, permission revoked, etc. -- RFC 8030 §7.3), so that row is
+// deleted rather than left to fail forever on every future trigger. Every
+// other outcome (including a network error) is just logged -- one broken
+// subscription, or the whole push service being unreachable, must never
+// take down the trade/message/rating action that triggered it, and must
+// never stop the in-app notification from having already been saved.
+export async function notifyAccount(env, accountId, { title, body, tag, linkTab }) {
+  try {
+    await env.DB.prepare(
+      `INSERT INTO notifications (id, account_id, title, body, link_tab, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(newId(), accountId, title, body, linkTab ?? null, Date.now())
+      .run()
+  } catch (err) {
+    console.error('saving in-app notification failed', accountId, err)
+  }
+
   const vapid = vapidKeys(env)
   if (!vapid) return
 

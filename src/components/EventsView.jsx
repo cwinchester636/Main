@@ -16,6 +16,9 @@ function formatEventDate(ts) {
 function EventCard({ event, canDelete, token, onDeleted }) {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+  const [rsvpBusy, setRsvpBusy] = useState(false)
+  const [going, setGoing] = useState(event.going)
+  const [rsvpCount, setRsvpCount] = useState(event.rsvpCount)
   const proximityLabel = distanceLabel(event)
 
   const handleDelete = async () => {
@@ -28,6 +31,20 @@ function EventCard({ event, canDelete, token, onDeleted }) {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not remove this event.')
       setDeleting(false)
+    }
+  }
+
+  const handleToggleRsvp = async () => {
+    setRsvpBusy(true)
+    setError('')
+    try {
+      const result = await api.rsvpToEvent(token, event.id)
+      setGoing(result.going)
+      setRsvpCount(result.rsvpCount)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not update your RSVP.')
+    } finally {
+      setRsvpBusy(false)
     }
   }
 
@@ -58,11 +75,24 @@ function EventCard({ event, canDelete, token, onDeleted }) {
 
       {error && <p className="form-error">{error}</p>}
 
-      {canDelete && (
-        <button type="button" className="link-button danger" disabled={deleting} onClick={handleDelete}>
-          {deleting ? 'Removing…' : 'Remove event'}
+      <div className="event-footer-actions">
+        <button
+          type="button"
+          className={`button small ${going ? 'secondary' : 'primary'}`}
+          disabled={rsvpBusy}
+          onClick={handleToggleRsvp}
+        >
+          {going ? '✓ Going' : "I'm going"}
         </button>
-      )}
+        <span className="section-hint">
+          {rsvpCount} going
+        </span>
+        {canDelete && (
+          <button type="button" className="link-button danger" disabled={deleting} onClick={handleDelete}>
+            {deleting ? 'Removing…' : 'Remove event'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
