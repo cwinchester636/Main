@@ -30,12 +30,24 @@ export async function getExistingSubscription() {
   return registration.pushManager.getSubscription()
 }
 
-// Registers the service worker if it isn't already, asks for Notification
-// permission (a no-op if already granted/denied — the browser only ever
-// prompts once), then subscribes and hands the subscription to the backend.
-// Throws on denial/failure rather than swallowing it — the caller (the
-// Profile toggle) is what surfaces that to the person, this just does the
-// work.
+// Asks for Notification permission (a no-op if already granted/denied — the
+// browser only ever prompts once), registers the service worker, then
+// subscribes and hands the subscription to the backend. Throws on
+// denial/failure rather than swallowing it — the caller (the Profile
+// toggle) is what surfaces that to the person, this just does the work.
+//
+// Notification.requestPermission() has to be the very first await here,
+// before anything else — confirmed by a real-device bug report (Pixel/
+// Chrome) that reproduced as "permission not granted" with *no* prompt
+// ever shown and *no* decision ever recorded in Chrome's own site
+// settings, which only happens when the call is auto-denied rather than
+// actually asked. Mobile Chrome requires a "user activation" window (a
+// real tap) to show the permission prompt at all, and that window is
+// consumed/expires quickly; awaiting the service worker's register()/ready
+// (a real network round-trip, install and activate lifecycle) before
+// calling requestPermission() reliably burned through it, so by the time
+// permission was actually requested the browser no longer considered it
+// user-initiated and silently refused instead of prompting.
 //
 // pushManager.subscribe() talks to the browser's push service (FCM for
 // Chrome, etc.) to register the endpoint, and confirmed in testing it can
@@ -46,11 +58,11 @@ export async function getExistingSubscription() {
 export async function subscribeToPush(token) {
   if (!isPushSupported()) throw new Error('Push notifications aren’t supported in this browser.')
 
-  const registration = await navigator.serviceWorker.register('/sw.js')
-  await navigator.serviceWorker.ready
-
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') throw new Error('Notification permission was not granted.')
+
+  const registration = await navigator.serviceWorker.register('/sw.js')
+  await navigator.serviceWorker.ready
 
   let subscription = await registration.pushManager.getSubscription()
   if (!subscription) {
