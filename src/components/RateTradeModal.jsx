@@ -7,12 +7,19 @@ export default function RateTradeModal({ token, tradeId, counterpartyUsername, e
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  const commentRequired = thumbsUp === false
+  const trimmedComment = comment.trim()
+
   const handleSubmit = async () => {
     if (thumbsUp === null) return
+    if (commentRequired && !trimmedComment) {
+      setError('Let them know what went wrong so other collectors can see it.')
+      return
+    }
     setSubmitting(true)
     setError('')
     try {
-      await api.rateTrade(token, tradeId, thumbsUp, comment.trim() || undefined)
+      await api.rateTrade(token, tradeId, thumbsUp, trimmedComment || undefined)
       onRated(thumbsUp)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not submit your rating.')
@@ -50,14 +57,20 @@ export default function RateTradeModal({ token, tradeId, counterpartyUsername, e
           </button>
         </div>
 
-        <label className="field-label" htmlFor="rate-comment">Comment (optional)</label>
+        <label className="field-label" htmlFor="rate-comment">
+          Comment {commentRequired ? '(required for a bad trade)' : '(optional)'}
+        </label>
         <textarea
           id="rate-comment"
           className="text-input textarea"
           rows={3}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Anything else worth knowing about trading with this person…"
+          placeholder={
+            commentRequired
+              ? 'What went wrong with this trade?'
+              : 'Anything else worth knowing about trading with this person…'
+          }
         />
 
         {error && <p className="form-error">{error}</p>}
@@ -65,7 +78,7 @@ export default function RateTradeModal({ token, tradeId, counterpartyUsername, e
         <button
           type="button"
           className="button primary full"
-          disabled={thumbsUp === null || submitting}
+          disabled={thumbsUp === null || submitting || (commentRequired && !trimmedComment)}
           onClick={handleSubmit}
         >
           {submitting ? 'Submitting…' : 'Submit rating'}

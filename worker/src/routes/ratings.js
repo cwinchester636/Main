@@ -51,6 +51,9 @@ export async function rateTrade(request, env, account, tradeId) {
   const body = await request.json().catch(() => null)
   if (!body || typeof body.thumbsUp !== 'boolean') return error('thumbsUp (true/false) is required')
   const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 1000) || null : null
+  if (!body.thumbsUp && !comment) {
+    return error('a comment explaining what went wrong is required for a negative rating')
+  }
 
   const ratedAccountId = isFrom ? trade.to_account_id : trade.from_account_id
   const id = newId()
