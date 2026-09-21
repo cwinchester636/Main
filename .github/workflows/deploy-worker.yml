@@ -40,3 +40,22 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           command: deploy --config ./wrangler.toml
+
+      # Browser push (see worker/src/push.js, README "Push notifications")
+      # needs its private VAPID key as a Worker secret, never checked into
+      # git — only its public half lives in wrangler.toml. Runs on every
+      # deploy (idempotent — same value each time) rather than as a one-off
+      # manual step, so it survives worker recreation. Skipped entirely
+      # until the one-time repo secret below is added — see README — rather
+      # than failing the whole deploy over a secret that isn't set yet.
+      - name: Set VAPID private key secret
+        if: ${{ secrets.VAPID_PRIVATE_KEY != '' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          secrets: |
+            VAPID_PRIVATE_KEY
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}

@@ -1,5 +1,6 @@
 import { error, json, newId, matchKey, requireNotSuspended } from '../utils.js'
 import { getRatingSummaries } from './ratings.js'
+import { notifyAccount } from '../push.js'
 
 // "completed" isn't a stored status value — it's derived from both
 // confirmation timestamps being set on an accepted trade. See
@@ -88,7 +89,7 @@ function snapshotInsert(env, tradeId, ownerAccountId, row, snapshotPhotoKey, cre
   )
 }
 
-export async function proposeTrade(request, env, account) {
+export async function proposeTrade(request, env, account, ctx) {
   const suspended = requireNotSuspended(account)
   if (suspended) return suspended
 
@@ -128,6 +129,14 @@ export async function proposeTrade(request, env, account) {
     ...fromOffers.map((row, i) => snapshotInsert(env, id, account.id, row, fromPhotoKeys[i], createdAt)),
     ...toOffers.map((row, i) => snapshotInsert(env, id, body.toAccountId, row, toPhotoKeys[i], createdAt)),
   ])
+
+  ctx?.waitUntil(
+    notifyAccount(env, body.toAccountId, {
+      title: 'New trade proposal',
+      body: `${account.username} wants to trade with you`,
+      tag: `trade-${id}`,
+    }),
+  )
 
   return json(
     {
@@ -206,7 +215,7 @@ export async function getTrades(env, account) {
   return json({ sent, received })
 }
 
-export async function respondToTrade(request, env, account, tradeId) {
+export async function respondToTrade(request, env, account, tradeId, ctx) {
   const suspended = requireNotSuspended(account)
   if (suspended) return suspended
 
@@ -234,10 +243,20 @@ export async function respondToTrade(request, env, account, tradeId) {
     .bind(status, toCash, tradeId)
     .run()
 
+  if (status === 'accepted') {
+    ctx?.waitUntil(
+      notifyAccount(env, row.from_account_id, {
+        title: 'Trade accepted',
+        body: `${account.username} accepted your trade proposal`,
+        tag: `trade-${tradeId}`,
+      }),
+    )
+  }
+
   return json({ proposal: { ...row, status, to_cash: toCash } })
 }
 
-export async function confirmTrade(env, account, tradeId) {
+export async function confirmTrade(env, account, tradeId, ctx) {
   const suspended = requireNotSuspended(account)
   if (suspended) return suspended
 
@@ -255,10 +274,24 @@ export async function confirmTrade(env, account, tradeId) {
     return json({ proposal: { ...row, status: deriveStatus(row), completedAt: completedAt(row) } })
   }
 
+  const otherColumn = isFrom ? 'to_confirmed_at' : 'from_confirmed_at'
+  const counterpartyId = isFrom ? row.to_account_id : row.from_account_id
+  const completesTrade = !!row[otherColumn]
+
   const confirmedAt = Date.now()
   await env.DB.prepare(`UPDATE trade_proposals SET ${column} = ? WHERE id = ?`)
     .bind(confirmedAt, tradeId)
     .run()
+
+  if (completesTrade) {
+    ctx?.waitUntil(
+      notifyAccount(env, counterpartyId, {
+        title: 'Trade completed',
+        body: `Your trade with ${account.username} is confirmed — rate it!`,
+        tag: `trade-${tradeId}`,
+      }),
+    )
+  }
 
   const updated = { ...row, [column]: confirmedAt }
   return json({ proposal: { ...updated, status: deriveStatus(updated), completedAt: completedAt(updated) } })

@@ -1,16 +1,57 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AvatarPicker from './AvatarPicker.jsx'
 import { ApiError } from '../api/client.js'
+import { getExistingSubscription, isPushSupported, subscribeToPush, unsubscribeFromPush } from '../utils/push.js'
 
 const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250]
 
-export default function ProfileView({ account, onUpdate, onLogOut }) {
+export default function ProfileView({ account, token, onUpdate, onLogOut }) {
   const [avatar, setAvatar] = useState(account.avatar)
   const [zip, setZip] = useState(account.zip || '')
   const [radiusMiles, setRadiusMiles] = useState(account.radiusMiles ?? null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+
+  // 'unsupported' | 'checking' | 'off' | 'on' — checked once against the
+  // browser's actual subscription state rather than assumed, since it can
+  // change outside this app (permission revoked in browser settings, etc.).
+  const [pushState, setPushState] = useState(isPushSupported() ? 'checking' : 'unsupported')
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushError, setPushError] = useState('')
+
+  useEffect(() => {
+    if (!isPushSupported()) return
+    getExistingSubscription()
+      .then((sub) => setPushState(sub ? 'on' : 'off'))
+      .catch(() => setPushState('off'))
+  }, [])
+
+  const handleEnablePush = async () => {
+    setPushBusy(true)
+    setPushError('')
+    try {
+      await subscribeToPush(token)
+      setPushState('on')
+    } catch (err) {
+      setPushError(err.message || 'Could not enable notifications.')
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
+  const handleDisablePush = async () => {
+    setPushBusy(true)
+    setPushError('')
+    try {
+      await unsubscribeFromPush(token)
+      setPushState('off')
+    } catch (err) {
+      setPushError(err instanceof ApiError ? err.message : 'Could not disable notifications.')
+    } finally {
+      setPushBusy(false)
+    }
+  }
 
   const dirty =
     avatar !== account.avatar || zip !== (account.zip || '') || radiusMiles !== (account.radiusMiles ?? null)
@@ -73,6 +114,34 @@ export default function ProfileView({ account, onUpdate, onLogOut }) {
       <button type="button" className="button primary" disabled={!dirty || saving} onClick={save}>
         {saving ? 'Saving…' : 'Save changes'}
       </button>
+
+      <div className="profile-section">
+        <h2>Notifications</h2>
+        {pushState === 'unsupported' && (
+          <p className="section-hint">This browser doesn't support push notifications.</p>
+        )}
+        {pushState === 'checking' && <p className="section-hint">Checking…</p>}
+        {pushState === 'off' && (
+          <>
+            <p className="section-hint">
+              Get notified about new trade proposals, accepted trades, completed trades, and new messages — even
+              when SwapDeck isn't open.
+            </p>
+            <button type="button" className="button secondary" disabled={pushBusy} onClick={handleEnablePush}>
+              {pushBusy ? 'Enabling…' : 'Enable notifications'}
+            </button>
+          </>
+        )}
+        {pushState === 'on' && (
+          <>
+            <p className="form-success">Notifications are on for this browser.</p>
+            <button type="button" className="button secondary" disabled={pushBusy} onClick={handleDisablePush}>
+              {pushBusy ? 'Disabling…' : 'Turn off notifications'}
+            </button>
+          </>
+        )}
+        {pushError && <p className="form-error">{pushError}</p>}
+      </div>
 
       <div className="danger-zone">
         <h2>Log out</h2>

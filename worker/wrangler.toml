@@ -24,3 +24,12 @@ id = "1da319054a174eff885a7f73a4a6175e"
 # real code review + deploy, never a silent database write. See
 # worker/src/admin.js.
 ADMIN_USERNAMES = "cwinchester636"
+
+# Browser push (see worker/src/push.js). The public key is, by definition,
+# public — it's handed to every subscribing browser (VITE_VAPID_PUBLIC_KEY
+# in .env must be this same value). VAPID_SUBJECT just identifies this app
+# to push services per RFC 8292, any https URL or mailto: works. The
+# matching VAPID_PRIVATE_KEY is a Worker secret (`wrangler secret put`),
+# never checked into git — see README "Push notifications".
+VAPID_PUBLIC_KEY = "BLw28wJ4CUrHRBlSUzP14zNOrpWO6YCp38c3gJySxD1XppklHWqNeeWDWe36QvpHmkmmd3wDvbpjqIai7qofLZ0"
+VAPID_SUBJECT = "https://swapdeck.cards"

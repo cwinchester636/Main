@@ -1,6 +1,9 @@
 import { error, json, newId, requireNotSuspended } from '../utils.js'
 import { isAdminUsername } from '../admin.js'
 import { hasOpenReport } from './reports.js'
+import { notifyAccount } from '../push.js'
+
+const NOTIFICATION_PREVIEW_LENGTH = 120
 
 const MAX_MESSAGE_LENGTH = 2000
 
@@ -49,7 +52,7 @@ export async function getMessages(env, account, tradeId) {
 
 // Only the two participants can send — an admin reviewing a reported
 // trade's chat log can read it, never post into it.
-export async function sendMessage(request, env, account, tradeId) {
+export async function sendMessage(request, env, account, tradeId, ctx) {
   const suspended = requireNotSuspended(account)
   if (suspended) return suspended
 
@@ -71,6 +74,15 @@ export async function sendMessage(request, env, account, tradeId) {
   )
     .bind(id, tradeId, account.id, text, createdAt)
     .run()
+
+  const recipientId = trade.from_account_id === account.id ? trade.to_account_id : trade.from_account_id
+  ctx?.waitUntil(
+    notifyAccount(env, recipientId, {
+      title: `New message from ${account.username}`,
+      body: text.length > NOTIFICATION_PREVIEW_LENGTH ? `${text.slice(0, NOTIFICATION_PREVIEW_LENGTH)}…` : text,
+      tag: `trade-${tradeId}`,
+    }),
+  )
 
   return json(
     { message: { id, senderAccountId: account.id, senderUsername: account.username, body: text, createdAt } },

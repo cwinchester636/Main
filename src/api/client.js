@@ -93,4 +93,8 @@ export const api = {
   adminListReports: (token) => request('/api/admin/reports', { token }),
   adminResolveReport: (token, reportId) =>
     request(`/api/admin/reports/${reportId}`, { method: 'PATCH', token }),
+
+  pushSubscribe: (token, subscription) => request('/api/push/subscribe', { method: 'POST', token, body: subscription }),
+  pushUnsubscribe: (token, endpoint) =>
+    request('/api/push/unsubscribe', { method: 'POST', token, body: { endpoint } }),
 }

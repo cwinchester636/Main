@@ -171,7 +171,7 @@ export default function App() {
             <AdminView token={token} currentAccountId={account.id} />
           )}
           {tab === 'profile' && (
-            <ProfileView account={account} onUpdate={updateProfile} onLogOut={logOut} />
+            <ProfileView account={account} token={token} onUpdate={updateProfile} onLogOut={logOut} />
           )}
         </main>
         <BottomNav

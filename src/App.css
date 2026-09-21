@@ -997,13 +997,15 @@
   background: var(--primary-soft);
 }
 
-.danger-zone {
+.danger-zone,
+.profile-section {
   margin-top: 30px;
   padding-top: 20px;
   border-top: 1px solid var(--border);
 }
 
-.danger-zone h2 {
+.danger-zone h2,
+.profile-section h2 {
   font-size: 1rem;
   margin: 0 0 4px;
 }

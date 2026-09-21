@@ -81,19 +81,20 @@ export async function deleteUser(env, account, targetId) {
   if (!target) return error('user not found', 404)
 
   // Explicit cascade rather than relying on collection_items/trade_proposals/
-  // trade_snapshot_items/trade_messages/trade_reports/trade_ratings' ON
-  // DELETE CASCADE foreign keys actually being enforced — SQLite (and by
-  // extension D1) only enforces FK constraints when foreign_keys is turned
-  // on for the connection, which nothing in this codebase does, so this
-  // can't assume it's active. Everything trade_id-scoped goes first since
-  // it references trade_proposals rows this same batch deletes right
-  // after — scoping by "any trade this account was ever a party to" also
-  // correctly covers every message/report/rating they were involved in,
-  // since a rating's rater and rated account are always the trade's two
-  // participants, same as messages/reports only ever happening on your own
-  // trade.
+  // trade_snapshot_items/trade_messages/trade_reports/trade_ratings/
+  // push_subscriptions' ON DELETE CASCADE foreign keys actually being
+  // enforced — SQLite (and by extension D1) only enforces FK constraints
+  // when foreign_keys is turned on for the connection, which nothing in
+  // this codebase does, so this can't assume it's active. Everything
+  // trade_id-scoped goes first since it references trade_proposals rows
+  // this same batch deletes right after — scoping by "any trade this
+  // account was ever a party to" also correctly covers every
+  // message/report/rating they were involved in, since a rating's rater
+  // and rated account are always the trade's two participants, same as
+  // messages/reports only ever happening on your own trade.
   await env.DB.batch([
     env.DB.prepare('DELETE FROM collection_items WHERE account_id = ?').bind(targetId),
+    env.DB.prepare('DELETE FROM push_subscriptions WHERE account_id = ?').bind(targetId),
     env.DB.prepare(
       `DELETE FROM trade_snapshot_items WHERE trade_id IN
          (SELECT id FROM trade_proposals WHERE from_account_id = ? OR to_account_id = ?)`,

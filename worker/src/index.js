@@ -8,9 +8,10 @@ import { requireAdmin, listUsers, deleteUser, listTrades, getTradeSnapshotPhoto,
 import { getMessages, sendMessage } from './routes/messages.js'
 import { createReport, adminListReports, adminResolveReport } from './routes/reports.js'
 import { rateTrade } from './routes/ratings.js'
+import { subscribe, unsubscribe } from './push.js'
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === 'OPTIONS') return handleOptions()
 
     const url = new URL(request.url)
@@ -48,15 +49,15 @@ export default {
       if (path === '/api/matches' && request.method === 'GET') return await getMatches(env, account)
 
       if (path === '/api/trades' && request.method === 'GET') return await getTrades(env, account)
-      if (path === '/api/trades' && request.method === 'POST') return await proposeTrade(request, env, account)
+      if (path === '/api/trades' && request.method === 'POST') return await proposeTrade(request, env, account, ctx)
 
       const tradeMatch = path.match(/^\/api\/trades\/([^/]+)$/)
       if (tradeMatch && request.method === 'PATCH') {
-        return await respondToTrade(request, env, account, tradeMatch[1])
+        return await respondToTrade(request, env, account, tradeMatch[1], ctx)
       }
       const confirmMatch = path.match(/^\/api\/trades\/([^/]+)\/confirm$/)
       if (confirmMatch && request.method === 'POST') {
-        return await confirmTrade(env, account, confirmMatch[1])
+        return await confirmTrade(env, account, confirmMatch[1], ctx)
       }
 
       const messagesMatch = path.match(/^\/api\/trades\/([^/]+)\/messages$/)
@@ -64,7 +65,7 @@ export default {
         return await getMessages(env, account, messagesMatch[1])
       }
       if (messagesMatch && request.method === 'POST') {
-        return await sendMessage(request, env, account, messagesMatch[1])
+        return await sendMessage(request, env, account, messagesMatch[1], ctx)
       }
       const reportMatch = path.match(/^\/api\/trades\/([^/]+)\/report$/)
       if (reportMatch && request.method === 'POST') {
@@ -73,6 +74,13 @@ export default {
       const ratingMatch = path.match(/^\/api\/trades\/([^/]+)\/rating$/)
       if (ratingMatch && request.method === 'POST') {
         return await rateTrade(request, env, account, ratingMatch[1])
+      }
+
+      if (path === '/api/push/subscribe' && request.method === 'POST') {
+        return await subscribe(request, env, account)
+      }
+      if (path === '/api/push/unsubscribe' && request.method === 'POST') {
+        return await unsubscribe(request, env, account)
       }
 
       if (path === '/api/admin/users' && request.method === 'GET') {
