@@ -45,17 +45,24 @@ jobs:
       # needs its private VAPID key as a Worker secret, never checked into
       # git — only its public half lives in wrangler.toml. Runs on every
       # deploy (idempotent — same value each time) rather than as a one-off
-      # manual step, so it survives worker recreation. Skipped entirely
-      # until the one-time repo secret below is added — see README — rather
-      # than failing the whole deploy over a secret that isn't set yet.
+      # manual step, so it survives worker recreation. A plain bash `if`
+      # rather than a step-level `if:` conditional referencing `secrets` --
+      # a first attempt at that failed the entire workflow before any job
+      # even started (confirmed: the run showed the workflow's file path
+      # instead of its name and produced zero jobs, GitHub's signature for
+      # a workflow that failed schema validation). Skips itself with an
+      # ordinary shell check until the one-time repo secret below is added
+      # (see README) instead of failing the deploy over a secret that
+      # isn't set yet.
       - name: Set VAPID private key secret
-        if: ${{ secrets.VAPID_PRIVATE_KEY != '' }}
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: worker
-          secrets: |
-            VAPID_PRIVATE_KEY
+        working-directory: worker
         env:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$VAPID_PRIVATE_KEY" ]; then
+            echo "$VAPID_PRIVATE_KEY" | npx wrangler secret put VAPID_PRIVATE_KEY --config ./wrangler.toml
+          else
+            echo "VAPID_PRIVATE_KEY repo secret not set yet -- skipping (see README 'Push notifications')."
+          fi
