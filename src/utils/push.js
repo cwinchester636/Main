@@ -2,6 +2,12 @@ import { api } from '../api/client.js'
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
 
+// A distinct type rather than matching on the generic Error's message text —
+// lets the UI (ProfileView.jsx) show the specific "here's how to fix it in
+// your browser" steps only for this one failure, and a plain one-line
+// message for everything else (unsupported browser, subscribe timeout).
+export class PushPermissionError extends Error {}
+
 export function isPushSupported() {
   return 'serviceWorker' in navigator && 'PushManager' in window && !!VAPID_PUBLIC_KEY
 }
@@ -59,7 +65,7 @@ export async function subscribeToPush(token) {
   if (!isPushSupported()) throw new Error('Push notifications aren’t supported in this browser.')
 
   const permission = await Notification.requestPermission()
-  if (permission !== 'granted') throw new Error('Notification permission was not granted.')
+  if (permission !== 'granted') throw new PushPermissionError('Notification permission was not granted.')
 
   const registration = await navigator.serviceWorker.register('/sw.js')
   await navigator.serviceWorker.ready

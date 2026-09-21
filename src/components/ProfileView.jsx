@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import AvatarPicker from './AvatarPicker.jsx'
 import { ApiError } from '../api/client.js'
-import { getExistingSubscription, isPushSupported, subscribeToPush, unsubscribeFromPush } from '../utils/push.js'
+import {
+  getExistingSubscription,
+  isPushSupported,
+  PushPermissionError,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from '../utils/push.js'
 
 const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250]
 
@@ -19,6 +25,7 @@ export default function ProfileView({ account, token, onUpdate, onLogOut }) {
   const [pushState, setPushState] = useState(isPushSupported() ? 'checking' : 'unsupported')
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState('')
+  const [pushPermissionDenied, setPushPermissionDenied] = useState(false)
 
   useEffect(() => {
     if (!isPushSupported()) return
@@ -30,11 +37,16 @@ export default function ProfileView({ account, token, onUpdate, onLogOut }) {
   const handleEnablePush = async () => {
     setPushBusy(true)
     setPushError('')
+    setPushPermissionDenied(false)
     try {
       await subscribeToPush(token)
       setPushState('on')
     } catch (err) {
-      setPushError(err.message || 'Could not enable notifications.')
+      if (err instanceof PushPermissionError) {
+        setPushPermissionDenied(true)
+      } else {
+        setPushError(err.message || 'Could not enable notifications.')
+      }
     } finally {
       setPushBusy(false)
     }
@@ -43,6 +55,7 @@ export default function ProfileView({ account, token, onUpdate, onLogOut }) {
   const handleDisablePush = async () => {
     setPushBusy(true)
     setPushError('')
+    setPushPermissionDenied(false)
     try {
       await unsubscribeFromPush(token)
       setPushState('off')
@@ -141,6 +154,23 @@ export default function ProfileView({ account, token, onUpdate, onLogOut }) {
           </>
         )}
         {pushError && <p className="form-error">{pushError}</p>}
+        {pushPermissionDenied && (
+          <div className="push-permission-help">
+            <p className="form-error">
+              Your browser didn't grant notification permission — either you (or a previous visit) blocked it, or
+              the prompt never got the chance to appear. Here's how to fix it:
+            </p>
+            <ol className="section-hint">
+              <li>
+                Open this site's settings in your browser — usually an icon next to the address bar, or your
+                browser's menu → <strong>Site settings</strong> → <strong>Notifications</strong> — and set it to{' '}
+                <strong>Allow</strong>.
+              </li>
+              <li>On a phone, also check your device's own Settings → Apps → your browser → Notifications is on.</li>
+              <li>Come back here and tap "Enable notifications" again.</li>
+            </ol>
+          </div>
+        )}
       </div>
 
       <div className="danger-zone">
