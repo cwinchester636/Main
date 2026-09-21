@@ -7,6 +7,7 @@ import HomeView from './components/HomeView.jsx'
 import CollectionView from './components/CollectionView.jsx'
 import MatchesView from './components/MatchesView.jsx'
 import TradesView from './components/TradesView.jsx'
+import EventsView from './components/EventsView.jsx'
 import AdminView from './components/AdminView.jsx'
 import ProfileView from './components/ProfileView.jsx'
 import './App.css'
@@ -19,20 +20,23 @@ export default function App() {
   const [wants, setWants] = useState([])
   const [matches, setMatches] = useState([])
   const [trades, setTrades] = useState({ sent: [], received: [] })
+  const [events, setEvents] = useState([])
   const [globalError, setGlobalError] = useState('')
   const [tab, setTab] = useState('home')
 
   const loadEverything = useCallback(async (activeToken) => {
     try {
-      const [collection, matchData, tradeData] = await Promise.all([
+      const [collection, matchData, tradeData, eventData] = await Promise.all([
         api.getCollection(activeToken),
         api.getMatches(activeToken),
         api.getTrades(activeToken),
+        api.getEvents(activeToken),
       ])
       setHaves(collection.haves)
       setWants(collection.wants)
       setMatches(matchData.matches)
       setTrades(tradeData)
+      setEvents(eventData.events)
       setGlobalError('')
     } catch (err) {
       setGlobalError(err instanceof ApiError ? err.message : 'Something went wrong loading your data.')
@@ -118,6 +122,19 @@ export default function App() {
     setTrades(tradeData)
   }
 
+  // Refetches rather than inserting the created event locally -- the create
+  // response doesn't include the server-computed distanceMiles/proximity
+  // fields listEvents adds, and re-fetching is the simplest way to get
+  // those without duplicating that computation on the client.
+  const addEvent = async () => {
+    const eventData = await api.getEvents(token)
+    setEvents(eventData.events)
+  }
+
+  const removeEvent = (eventId) => {
+    setEvents((prev) => prev.filter((e) => e.id !== eventId))
+  }
+
   const proposedAccountIds = trades.sent
     .filter((t) => t.status === 'pending' || t.status === 'accepted' || t.status === 'completed')
     .map((t) => t.counterparty.id)
@@ -165,6 +182,16 @@ export default function App() {
               token={token}
               currentAccountId={account.id}
               isSuspended={account.isSuspended}
+            />
+          )}
+          {tab === 'events' && (
+            <EventsView
+              events={events}
+              token={token}
+              currentAccountId={account.id}
+              isAdmin={account.isAdmin}
+              onCreated={addEvent}
+              onDeleted={removeEvent}
             />
           )}
           {tab === 'admin' && account.isAdmin && (

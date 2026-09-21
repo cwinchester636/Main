@@ -98,4 +98,8 @@ export const api = {
   pushSubscribe: (token, subscription) => request('/api/push/subscribe', { method: 'POST', token, body: subscription }),
   pushUnsubscribe: (token, endpoint) =>
     request('/api/push/unsubscribe', { method: 'POST', token, body: { endpoint } }),
+
+  getEvents: (token) => request('/api/events', { token }),
+  createEvent: (token, event) => request('/api/events', { method: 'POST', token, body: event }),
+  deleteEvent: (token, eventId) => request(`/api/events/${eventId}`, { method: 'DELETE', token }),
 }

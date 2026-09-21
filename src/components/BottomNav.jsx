@@ -3,6 +3,7 @@ const TABS = [
   { id: 'collection', label: 'Collection', emoji: '🗂️' },
   { id: 'matches', label: 'Matches', emoji: '🤝' },
   { id: 'trades', label: 'Trades', emoji: '🔄' },
+  { id: 'events', label: 'Events', emoji: '📅' },
   { id: 'profile', label: 'Profile', emoji: '👤' },
 ]
 const ADMIN_TAB = { id: 'admin', label: 'Admin', emoji: '🛠️' }

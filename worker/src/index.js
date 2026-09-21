@@ -9,6 +9,7 @@ import { getMessages, sendMessage } from './routes/messages.js'
 import { createReport, adminListReports, adminResolveReport } from './routes/reports.js'
 import { rateTrade, getRatingsForAccount } from './routes/ratings.js'
 import { subscribe, unsubscribe } from './push.js'
+import { listEvents, createEvent, deleteEvent } from './routes/events.js'
 
 export default {
   async fetch(request, env, ctx) {
@@ -79,6 +80,13 @@ export default {
       const accountRatingsMatch = path.match(/^\/api\/accounts\/([^/]+)\/ratings$/)
       if (accountRatingsMatch && request.method === 'GET') {
         return await getRatingsForAccount(env, accountRatingsMatch[1])
+      }
+
+      if (path === '/api/events' && request.method === 'GET') return await listEvents(env, account)
+      if (path === '/api/events' && request.method === 'POST') return await createEvent(request, env, account, ctx)
+      const eventMatch = path.match(/^\/api\/events\/([^/]+)$/)
+      if (eventMatch && request.method === 'DELETE') {
+        return await deleteEvent(env, account, eventMatch[1])
       }
 
       if (path === '/api/push/subscribe' && request.method === 'POST') {
