@@ -132,6 +132,12 @@ export default function App() {
             <button type="button" className="link-button" onClick={() => loadEverything(token)}>Retry</button>
           </div>
         )}
+        {account.isSuspended && (
+          <div className="global-error">
+            Your account has been suspended by an admin. You can still log in and manage your collection, but can't
+            trade or message other users.
+          </div>
+        )}
         <main className="app-main">
           {tab === 'home' && (
             <HomeView account={account} haves={haves} wants={wants} matches={matches} onNavigate={setTab} />
@@ -147,6 +153,7 @@ export default function App() {
               proposedAccountIds={proposedAccountIds}
               onPropose={proposeTrade}
               token={token}
+              isSuspended={account.isSuspended}
             />
           )}
           {tab === 'trades' && (
@@ -157,6 +164,7 @@ export default function App() {
               onConfirm={confirmTrade}
               token={token}
               currentAccountId={account.id}
+              isSuspended={account.isSuspended}
             />
           )}
           {tab === 'admin' && account.isAdmin && (

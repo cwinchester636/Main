@@ -4,8 +4,12 @@ import ValueDisparityModal from './ValueDisparityModal.jsx'
 import CashInput from './CashInput.jsx'
 import TradeChatModal from './TradeChatModal.jsx'
 import ReportTradeModal from './ReportTradeModal.jsx'
+import RateTradeModal from './RateTradeModal.jsx'
+import RatingBadge from './RatingBadge.jsx'
 import { checkValueDisparity } from '../utils/tradeValue.js'
 import { formatUSD } from '../utils/currency.js'
+
+const SUSPENDED_MESSAGE = "Your account has been suspended by an admin — you can't trade or message right now."
 
 const STATUS_LABEL = {
   pending: 'Awaiting response',
@@ -18,7 +22,7 @@ function formatDate(ts) {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function TradeCard({ trade, direction, match, onRespond, onConfirm, token, currentAccountId }) {
+function TradeCard({ trade, direction, match, onRespond, onConfirm, token, currentAccountId, isSuspended }) {
   const { counterparty, status } = trade
   const [checkingValue, setCheckingValue] = useState(false)
   const [disparity, setDisparity] = useState(null)
@@ -26,6 +30,8 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
   const [chatOpen, setChatOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [reportSubmitted, setReportSubmitted] = useState(false)
+  const [rateOpen, setRateOpen] = useState(false)
+  const [myRating, setMyRating] = useState(trade.myRating)
   const cashAmount = Number(cashInput) || 0
 
   const handleAcceptClick = async () => {
@@ -48,10 +54,15 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
       <div className="trade-card-header">
         <span className="match-avatar"><AvatarIcon value={counterparty.avatar} size={32} /></span>
         <span className="trade-summary-text">
-          <strong>{counterparty.username}</strong>
+          <span className="match-name-row">
+            <strong>{counterparty.username}</strong>
+            <RatingBadge rating={counterparty.rating} />
+          </span>
           <span className={`trade-status-badge status-${status}`}>{STATUS_LABEL[status]}</span>
         </span>
       </div>
+
+      {isSuspended && <p className="form-error">{SUSPENDED_MESSAGE}</p>}
 
       {(trade.myCash > 0 || trade.theirCash > 0) && (
         <p className="trade-hint">
@@ -61,7 +72,7 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
         </p>
       )}
 
-      {status === 'pending' && direction === 'received' && (
+      {status === 'pending' && direction === 'received' && !isSuspended && (
         <div className="trade-actions-column">
           <CashInput value={cashInput} onChange={setCashInput} label="Add cash to your side (optional)" />
           <div className="trade-actions">
@@ -79,7 +90,7 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
         <p className="trade-hint">Waiting for {counterparty.username} to respond.</p>
       )}
 
-      {status === 'accepted' && !trade.confirmedByMe && (
+      {status === 'accepted' && !trade.confirmedByMe && !isSuspended && (
         <div className="trade-actions">
           <button type="button" className="button primary" onClick={() => onConfirm(trade.id)}>
             Mark trade as complete
@@ -92,9 +103,21 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
       )}
 
       {status === 'completed' && (
-        <p className="trade-hint trade-hint-success">
-          ✓ Verified by both sides{trade.completedAt ? ` on ${formatDate(trade.completedAt)}` : ''}.
-        </p>
+        <>
+          <p className="trade-hint trade-hint-success">
+            ✓ Verified by both sides{trade.completedAt ? ` on ${formatDate(trade.completedAt)}` : ''}.
+          </p>
+          {myRating === null ? (
+            <button type="button" className="button secondary" onClick={() => setRateOpen(true)}>
+              Rate this trade
+            </button>
+          ) : (
+            <p className="trade-hint">
+              You rated this {myRating ? '👍 good' : '👎 bad'}.{' '}
+              <button type="button" className="link-button" onClick={() => setRateOpen(true)}>Change</button>
+            </p>
+          )}
+        </>
       )}
 
       <div className="trade-footer-actions">
@@ -113,6 +136,7 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
           token={token}
           tradeId={trade.id}
           currentAccountId={currentAccountId}
+          composeDisabledMessage={isSuspended ? SUSPENDED_MESSAGE : undefined}
           onClose={() => setChatOpen(false)}
         />
       )}
@@ -125,6 +149,20 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
           onSubmitted={() => {
             setReportOpen(false)
             setReportSubmitted(true)
+          }}
+        />
+      )}
+
+      {rateOpen && (
+        <RateTradeModal
+          token={token}
+          tradeId={trade.id}
+          counterpartyUsername={counterparty.username}
+          existingRating={myRating}
+          onClose={() => setRateOpen(false)}
+          onRated={(thumbsUp) => {
+            setMyRating(thumbsUp)
+            setRateOpen(false)
           }}
         />
       )}
@@ -149,7 +187,7 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
   )
 }
 
-export default function TradesView({ trades, matches, onRespond, onConfirm, token, currentAccountId }) {
+export default function TradesView({ trades, matches, onRespond, onConfirm, token, currentAccountId, isSuspended }) {
   const { sent, received } = trades
   const hasAny = sent.length > 0 || received.length > 0
   const matchByAccountId = (accountId) => matches.find((m) => m.account.id === accountId)
@@ -185,6 +223,7 @@ export default function TradesView({ trades, matches, onRespond, onConfirm, toke
                 onConfirm={onConfirm}
                 token={token}
                 currentAccountId={currentAccountId}
+                isSuspended={isSuspended}
               />
             ))}
           </div>
@@ -205,6 +244,7 @@ export default function TradesView({ trades, matches, onRespond, onConfirm, toke
                 onConfirm={onConfirm}
                 token={token}
                 currentAccountId={currentAccountId}
+                isSuspended={isSuspended}
               />
             ))}
           </div>

@@ -20,5 +20,6 @@ export function publicAccount(row) {
     avatar: row.avatar,
     zip: row.zip,
     radiusMiles: row.radius_miles ?? null,
+    isSuspended: !!row.suspended_at,
   }
 }

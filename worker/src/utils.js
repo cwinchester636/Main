@@ -19,6 +19,22 @@ export function handleOptions() {
   return new Response(null, { status: 204, headers: CORS_HEADERS })
 }
 
+// A suspended account (accounts.suspended_at, set only by an admin — see
+// migrations/0012_ratings_and_suspension.sql) can still log in and manage
+// their own collection; this is the specific gate the handful of routes
+// that could do more harm (proposing/responding to/confirming a trade,
+// sending a chat message) each call before doing anything else. Not
+// enforced in authenticate() itself, deliberately — suspension blocks
+// specific actions, not the account.
+export function requireNotSuspended(account) {
+  return account.suspended_at
+    ? error(
+        'your account has been suspended by an admin — you can still log in and manage your collection, but can’t trade or message other users',
+        403,
+      )
+    : null
+}
+
 export function newId() {
   return crypto.randomUUID()
 }

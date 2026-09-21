@@ -1,4 +1,4 @@
-import { error, json, newId } from '../utils.js'
+import { error, json, newId, requireNotSuspended } from '../utils.js'
 import { isAdminUsername } from '../admin.js'
 import { hasOpenReport } from './reports.js'
 
@@ -50,6 +50,9 @@ export async function getMessages(env, account, tradeId) {
 // Only the two participants can send — an admin reviewing a reported
 // trade's chat log can read it, never post into it.
 export async function sendMessage(request, env, account, tradeId) {
+  const suspended = requireNotSuspended(account)
+  if (suspended) return suspended
+
   const trade = await env.DB.prepare('SELECT * FROM trade_proposals WHERE id = ?').bind(tradeId).first()
   if (!trade) return error('trade not found', 404)
   if (trade.from_account_id !== account.id && trade.to_account_id !== account.id) {

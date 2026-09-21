@@ -4,10 +4,11 @@ import AvatarIcon from './AvatarIcon.jsx'
 import ValueDisparityModal from './ValueDisparityModal.jsx'
 import PhotoViewerModal from './PhotoViewerModal.jsx'
 import CashInput from './CashInput.jsx'
+import RatingBadge from './RatingBadge.jsx'
 import { distanceLabel } from '../utils/distance.js'
 import { checkValueDisparity } from '../utils/tradeValue.js'
 
-function MatchCard({ match, isProposed, onPropose, token }) {
+function MatchCard({ match, isProposed, onPropose, token, isSuspended }) {
   const [open, setOpen] = useState(false)
   const [proposing, setProposing] = useState(false)
   const [checkingValue, setCheckingValue] = useState(false)
@@ -39,6 +40,7 @@ function MatchCard({ match, isProposed, onPropose, token }) {
         <span className="match-summary-text">
           <span className="match-name-row">
             <strong>{account.username}</strong>
+            <RatingBadge rating={account.rating} />
             {proximityLabel && <span className="match-distance">{proximityLabel}</span>}
           </span>
           <span className={`match-badge ${isMutual ? 'badge-mutual' : 'badge-partial'}`}>
@@ -71,22 +73,34 @@ function MatchCard({ match, isProposed, onPropose, token }) {
             </div>
           )}
 
-          {!isProposed && (
-            <CashInput value={cashInput} onChange={setCashInput} label={`Add cash toward ${account.username}'s cards (optional)`} />
-          )}
+          {isSuspended ? (
+            <p className="form-error">
+              Your account has been suspended by an admin — you can't propose new trades right now.
+            </p>
+          ) : (
+            <>
+              {!isProposed && (
+                <CashInput
+                  value={cashInput}
+                  onChange={setCashInput}
+                  label={`Add cash toward ${account.username}'s cards (optional)`}
+                />
+              )}
 
-          <button
-            type="button"
-            className={`button ${isProposed ? 'secondary' : 'primary'} full`}
-            disabled={isProposed || proposing || checkingValue}
-            onClick={handleProposeClick}
-          >
-            {isProposed
-              ? '✓ Trade in progress — see Trades tab'
-              : checkingValue
-                ? 'Checking card values…'
-                : `Propose trade to ${account.username}`}
-          </button>
+              <button
+                type="button"
+                className={`button ${isProposed ? 'secondary' : 'primary'} full`}
+                disabled={isProposed || proposing || checkingValue}
+                onClick={handleProposeClick}
+              >
+                {isProposed
+                  ? '✓ Trade in progress — see Trades tab'
+                  : checkingValue
+                    ? 'Checking card values…'
+                    : `Propose trade to ${account.username}`}
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -113,7 +127,7 @@ function MatchCard({ match, isProposed, onPropose, token }) {
   )
 }
 
-export default function MatchesView({ matches, hasHaves, hasWants, proposedAccountIds, onPropose, token }) {
+export default function MatchesView({ matches, hasHaves, hasWants, proposedAccountIds, onPropose, token, isSuspended }) {
   if (!hasHaves || !hasWants) {
     return (
       <div className="view">
@@ -143,6 +157,7 @@ export default function MatchesView({ matches, hasHaves, hasWants, proposedAccou
             token={token}
             isProposed={proposedAccountIds.includes(match.account.id)}
             onPropose={onPropose}
+            isSuspended={isSuspended}
           />
         ))}
       </div>

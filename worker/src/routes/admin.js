@@ -1,6 +1,7 @@
 import { error, json, servePhoto } from '../utils.js'
 import { isAdminUsername } from '../admin.js'
 import { deriveStatus, completedAt } from './trades.js'
+import { getRatingSummaries } from './ratings.js'
 
 export function requireAdmin(account, env) {
   return isAdminUsername(account.username, env) ? null : error('admin access required', 403)
@@ -27,8 +28,10 @@ function serializeSnapshotCard(row) {
 // anything that could authenticate as them.
 export async function listUsers(env) {
   const rows = await env.DB.prepare(
-    'SELECT id, username, email, avatar, zip, created_at FROM accounts ORDER BY created_at ASC LIMIT 500',
+    'SELECT id, username, email, avatar, zip, created_at, suspended_at FROM accounts ORDER BY created_at ASC LIMIT 500',
   ).all()
+
+  const ratingSummaries = await getRatingSummaries(env, rows.results.map((row) => row.id))
 
   return json({
     users: rows.results.map((row) => ({
@@ -38,8 +41,35 @@ export async function listUsers(env) {
       avatar: row.avatar,
       zip: row.zip,
       createdAt: row.created_at,
+      isSuspended: !!row.suspended_at,
+      suspendedAt: row.suspended_at,
+      rating: ratingSummaries.get(row.id) ?? { positivePct: null, count: 0 },
     })),
   })
+}
+
+// Deliberately admin-only and manual, never automatic off a rating/report
+// threshold — a coordinated pile-on of false negative ratings or reports
+// shouldn't be able to suspend an innocent account with no human review,
+// same reasoning as fraud reports already requiring admin judgment before
+// anything happens. Blocks trading and messaging (requireNotSuspended,
+// checked in proposeTrade/respondToTrade/confirmTrade/sendMessage) but
+// never login or collection management — see README "Ratings &
+// suspension".
+export async function setUserSuspended(request, env, account, targetId) {
+  if (targetId === account.id) return error('cannot suspend your own account', 400)
+
+  const body = await request.json().catch(() => null)
+  if (!body || typeof body.suspended !== 'boolean') return error('suspended (true/false) is required')
+
+  const target = await env.DB.prepare('SELECT id FROM accounts WHERE id = ?').bind(targetId).first()
+  if (!target) return error('user not found', 404)
+
+  await env.DB.prepare('UPDATE accounts SET suspended_at = ? WHERE id = ?')
+    .bind(body.suspended ? Date.now() : null, targetId)
+    .run()
+
+  return json({ id: targetId, isSuspended: body.suspended })
 }
 
 export async function deleteUser(env, account, targetId) {
@@ -51,15 +81,17 @@ export async function deleteUser(env, account, targetId) {
   if (!target) return error('user not found', 404)
 
   // Explicit cascade rather than relying on collection_items/trade_proposals/
-  // trade_snapshot_items/trade_messages/trade_reports' ON DELETE CASCADE
-  // foreign keys actually being enforced — SQLite (and by extension D1)
-  // only enforces FK constraints when foreign_keys is turned on for the
-  // connection, which nothing in this codebase does, so this can't assume
-  // it's active. Everything trade_id-scoped goes first since it references
-  // trade_proposals rows this same batch deletes right after — scoping by
-  // "any trade this account was ever a party to" also correctly covers
-  // every message they sent and every report they filed, since both only
-  // ever happen on your own trade.
+  // trade_snapshot_items/trade_messages/trade_reports/trade_ratings' ON
+  // DELETE CASCADE foreign keys actually being enforced — SQLite (and by
+  // extension D1) only enforces FK constraints when foreign_keys is turned
+  // on for the connection, which nothing in this codebase does, so this
+  // can't assume it's active. Everything trade_id-scoped goes first since
+  // it references trade_proposals rows this same batch deletes right
+  // after — scoping by "any trade this account was ever a party to" also
+  // correctly covers every message/report/rating they were involved in,
+  // since a rating's rater and rated account are always the trade's two
+  // participants, same as messages/reports only ever happening on your own
+  // trade.
   await env.DB.batch([
     env.DB.prepare('DELETE FROM collection_items WHERE account_id = ?').bind(targetId),
     env.DB.prepare(
@@ -72,6 +104,10 @@ export async function deleteUser(env, account, targetId) {
     ).bind(targetId, targetId),
     env.DB.prepare(
       `DELETE FROM trade_reports WHERE trade_id IN
+         (SELECT id FROM trade_proposals WHERE from_account_id = ? OR to_account_id = ?)`,
+    ).bind(targetId, targetId),
+    env.DB.prepare(
+      `DELETE FROM trade_ratings WHERE trade_id IN
          (SELECT id FROM trade_proposals WHERE from_account_id = ? OR to_account_id = ?)`,
     ).bind(targetId, targetId),
     env.DB.prepare('DELETE FROM trade_proposals WHERE from_account_id = ? OR to_account_id = ?').bind(
@@ -92,8 +128,8 @@ export async function deleteUser(env, account, targetId) {
 // since been edited or removed from either collection.
 export async function listTrades(env) {
   const trades = await env.DB.prepare(
-    `SELECT tp.*, fa.username AS from_username, fa.email AS from_email, fa.avatar AS from_avatar,
-            ta.username AS to_username, ta.email AS to_email, ta.avatar AS to_avatar
+    `SELECT tp.*, fa.username AS from_username, fa.email AS from_email, fa.avatar AS from_avatar, fa.suspended_at AS from_suspended_at,
+            ta.username AS to_username, ta.email AS to_email, ta.avatar AS to_avatar, ta.suspended_at AS to_suspended_at
      FROM trade_proposals tp
      JOIN accounts fa ON fa.id = tp.from_account_id
      JOIN accounts ta ON ta.id = tp.to_account_id
@@ -104,6 +140,8 @@ export async function listTrades(env) {
   if (trades.results.length === 0) return json({ trades: [] })
 
   const tradeIds = trades.results.map((row) => row.id)
+  const accountIds = trades.results.flatMap((row) => [row.from_account_id, row.to_account_id])
+  const ratingSummaries = await getRatingSummaries(env, accountIds)
   const placeholders = tradeIds.map(() => '?').join(', ')
   const snapshots = await env.DB.prepare(
     `SELECT * FROM trade_snapshot_items WHERE trade_id IN (${placeholders})`,
@@ -129,8 +167,22 @@ export async function listTrades(env) {
         completedAt: completedAt(row),
         fromCash: row.from_cash,
         toCash: row.to_cash,
-        from: { id: row.from_account_id, username: row.from_username, email: row.from_email, avatar: row.from_avatar },
-        to: { id: row.to_account_id, username: row.to_username, email: row.to_email, avatar: row.to_avatar },
+        from: {
+          id: row.from_account_id,
+          username: row.from_username,
+          email: row.from_email,
+          avatar: row.from_avatar,
+          isSuspended: !!row.from_suspended_at,
+          rating: ratingSummaries.get(row.from_account_id) ?? { positivePct: null, count: 0 },
+        },
+        to: {
+          id: row.to_account_id,
+          username: row.to_username,
+          email: row.to_email,
+          avatar: row.to_avatar,
+          isSuspended: !!row.to_suspended_at,
+          rating: ratingSummaries.get(row.to_account_id) ?? { positivePct: null, count: 0 },
+        },
         fromOffered: cards.filter((c) => c.owner_account_id === row.from_account_id).map(serializeSnapshotCard),
         toOffered: cards.filter((c) => c.owner_account_id === row.to_account_id).map(serializeSnapshotCard),
       }

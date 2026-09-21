@@ -1,4 +1,5 @@
-import { error, json, newId, matchKey } from '../utils.js'
+import { error, json, newId, matchKey, requireNotSuspended } from '../utils.js'
+import { getRatingSummaries } from './ratings.js'
 
 // "completed" isn't a stored status value — it's derived from both
 // confirmation timestamps being set on an accepted trade. See
@@ -88,6 +89,9 @@ function snapshotInsert(env, tradeId, ownerAccountId, row, snapshotPhotoKey, cre
 }
 
 export async function proposeTrade(request, env, account) {
+  const suspended = requireNotSuspended(account)
+  if (suspended) return suspended
+
   const body = await request.json().catch(() => null)
   if (!body || typeof body.toAccountId !== 'string') return error('toAccountId is required')
   if (body.toAccountId === account.id) return error('cannot propose a trade to yourself')
@@ -95,8 +99,11 @@ export async function proposeTrade(request, env, account) {
   const fromCash = parseCashAmount(body.cashAmount)
   if (fromCash === undefined) return error('cashAmount must be a non-negative number')
 
-  const target = await env.DB.prepare('SELECT id FROM accounts WHERE id = ?').bind(body.toAccountId).first()
+  const target = await env.DB.prepare('SELECT id, suspended_at FROM accounts WHERE id = ?')
+    .bind(body.toAccountId)
+    .first()
   if (!target) return error('account not found', 404)
+  if (target.suspended_at) return error('that account has been suspended and can’t receive new trades', 403)
 
   const existing = await env.DB.prepare(
     `SELECT * FROM trade_proposals
@@ -151,12 +158,30 @@ export async function getTrades(env, account) {
     .bind(account.id, account.id)
     .all()
 
+  const counterpartyIds = rows.results.map((row) =>
+    row.from_account_id === account.id ? row.to_account_id : row.from_account_id,
+  )
+  const ratingSummaries = await getRatingSummaries(env, counterpartyIds)
+
+  const tradeIds = rows.results.map((row) => row.id)
+  const myRatings = new Map()
+  if (tradeIds.length > 0) {
+    const placeholders = tradeIds.map(() => '?').join(', ')
+    const ratingRows = await env.DB.prepare(
+      `SELECT trade_id, thumbs_up FROM trade_ratings WHERE rater_account_id = ? AND trade_id IN (${placeholders})`,
+    )
+      .bind(account.id, ...tradeIds)
+      .all()
+    for (const r of ratingRows.results) myRatings.set(r.trade_id, !!r.thumbs_up)
+  }
+
   const sent = []
   const received = []
   for (const row of rows.results) {
     const isFrom = row.from_account_id === account.id
     const myConfirmedAt = isFrom ? row.from_confirmed_at : row.to_confirmed_at
     const theirConfirmedAt = isFrom ? row.to_confirmed_at : row.from_confirmed_at
+    const counterpartyId = isFrom ? row.to_account_id : row.from_account_id
     const entry = {
       id: row.id,
       status: deriveStatus(row),
@@ -166,9 +191,13 @@ export async function getTrades(env, account) {
       confirmedByThem: !!theirConfirmedAt,
       myCash: isFrom ? row.from_cash : row.to_cash,
       theirCash: isFrom ? row.to_cash : row.from_cash,
-      counterparty: isFrom
-        ? { id: row.to_account_id, username: row.to_username, avatar: row.to_avatar }
-        : { id: row.from_account_id, username: row.from_username, avatar: row.from_avatar },
+      myRating: myRatings.has(row.id) ? myRatings.get(row.id) : null,
+      counterparty: {
+        id: counterpartyId,
+        username: isFrom ? row.to_username : row.from_username,
+        avatar: isFrom ? row.to_avatar : row.from_avatar,
+        rating: ratingSummaries.get(counterpartyId) ?? { positivePct: null, count: 0 },
+      },
     }
     if (isFrom) sent.push(entry)
     else received.push(entry)
@@ -178,6 +207,9 @@ export async function getTrades(env, account) {
 }
 
 export async function respondToTrade(request, env, account, tradeId) {
+  const suspended = requireNotSuspended(account)
+  if (suspended) return suspended
+
   const body = await request.json().catch(() => null)
   if (!body || (body.action !== 'accept' && body.action !== 'decline')) {
     return error('action must be "accept" or "decline"')
@@ -206,6 +238,9 @@ export async function respondToTrade(request, env, account, tradeId) {
 }
 
 export async function confirmTrade(env, account, tradeId) {
+  const suspended = requireNotSuspended(account)
+  if (suspended) return suspended
+
   const row = await env.DB.prepare('SELECT * FROM trade_proposals WHERE id = ?').bind(tradeId).first()
   if (!row) return error('trade not found', 404)
   if (row.from_account_id !== account.id && row.to_account_id !== account.id) {

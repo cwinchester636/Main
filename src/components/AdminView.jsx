@@ -3,6 +3,7 @@ import AvatarIcon from './AvatarIcon.jsx'
 import CardChip from './CardChip.jsx'
 import PhotoViewerModal from './PhotoViewerModal.jsx'
 import TradeChatModal from './TradeChatModal.jsx'
+import RatingBadge from './RatingBadge.jsx'
 import { api, ApiError } from '../api/client.js'
 import { formatUSD } from '../utils/currency.js'
 
@@ -35,6 +36,7 @@ function AdminUsers({ token, currentAccountId }) {
   const [users, setUsers] = useState(null)
   const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState(null)
+  const [suspendingId, setSuspendingId] = useState(null)
 
   const load = async () => {
     try {
@@ -69,6 +71,27 @@ function AdminUsers({ token, currentAccountId }) {
     }
   }
 
+  const handleToggleSuspend = async (user) => {
+    const nextSuspended = !user.isSuspended
+    if (nextSuspended) {
+      const confirmed = window.confirm(
+        `Suspend ${user.username}? They'll be blocked from trading and messaging immediately, but can still log in and manage their collection.`,
+      )
+      if (!confirmed) return
+    }
+
+    setSuspendingId(user.id)
+    setError('')
+    try {
+      await api.adminSetUserSuspended(token, user.id, nextSuspended)
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isSuspended: nextSuspended } : u)))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not update this account.')
+    } finally {
+      setSuspendingId(null)
+    }
+  }
+
   return (
     <>
       <p className="view-subtitle">
@@ -80,23 +103,37 @@ function AdminUsers({ token, currentAccountId }) {
       {users && (
         <div className="admin-user-list">
           {users.map((user) => (
-            <div key={user.id} className="admin-user-row">
+            <div key={user.id} className={`admin-user-row${user.isSuspended ? ' admin-user-suspended' : ''}`}>
               <span className="match-avatar"><AvatarIcon value={user.avatar} size={32} /></span>
               <span className="admin-user-text">
-                <strong>{user.username}</strong>
+                <span className="match-name-row">
+                  <strong>{user.username}</strong>
+                  {user.isSuspended && <span className="trade-status-badge status-declined">Suspended</span>}
+                </span>
                 <span className="section-hint">{user.email || 'no email'} · joined {formatDate(user.createdAt)}</span>
+                <RatingBadge rating={user.rating} />
               </span>
               {user.id === currentAccountId ? (
                 <span className="admin-user-you">you</span>
               ) : (
-                <button
-                  type="button"
-                  className="button danger small"
-                  disabled={deletingId === user.id}
-                  onClick={() => handleDelete(user)}
-                >
-                  {deletingId === user.id ? 'Deleting…' : 'Delete'}
-                </button>
+                <span className="admin-user-actions">
+                  <button
+                    type="button"
+                    className={`button small ${user.isSuspended ? 'secondary' : 'danger'}`}
+                    disabled={suspendingId === user.id}
+                    onClick={() => handleToggleSuspend(user)}
+                  >
+                    {suspendingId === user.id ? '…' : user.isSuspended ? 'Unsuspend' : 'Suspend'}
+                  </button>
+                  <button
+                    type="button"
+                    className="button danger small"
+                    disabled={deletingId === user.id}
+                    onClick={() => handleDelete(user)}
+                  >
+                    {deletingId === user.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                </span>
               )}
             </div>
           ))}
@@ -118,6 +155,14 @@ function AdminTradeCard({ trade, token }) {
           <span className={`trade-status-badge status-${status}`}>{TRADE_STATUS_LABEL[status]}</span>
         </span>
       </div>
+
+      <p className="section-hint">
+        <RatingBadge rating={trade.from.rating} />
+        {trade.from.isSuspended && <span className="trade-status-badge status-declined">Suspended</span>}
+        {' vs '}
+        <RatingBadge rating={trade.to.rating} />
+        {trade.to.isSuspended && <span className="trade-status-badge status-declined">Suspended</span>}
+      </p>
 
       <p className="section-hint">
         Proposed {formatDate(trade.createdAt)}

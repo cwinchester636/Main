@@ -10,8 +10,17 @@ function formatTime(ts) {
 // readOnly: admin reviewing a reported trade's chat log can read it but
 // never post into it — see getMessages/sendMessage in worker/src/routes/
 // messages.js, which enforces the same thing server-side regardless of
-// what this prop is set to.
-export default function TradeChatModal({ token, tradeId, currentAccountId, readOnly = false, onClose }) {
+// what this prop is set to. composeDisabledMessage: same idea for a
+// suspended user — still shown the thread, just told why they can't add
+// to it, rather than letting them type into a box that'll just 403.
+export default function TradeChatModal({
+  token,
+  tradeId,
+  currentAccountId,
+  readOnly = false,
+  composeDisabledMessage,
+  onClose,
+}) {
   const [messages, setMessages] = useState(null)
   const [error, setError] = useState('')
   const [draft, setDraft] = useState('')
@@ -81,7 +90,9 @@ export default function TradeChatModal({ token, tradeId, currentAccountId, readO
           ))}
         </div>
 
-        {!readOnly && (
+        {!readOnly && composeDisabledMessage && <p className="trade-hint">{composeDisabledMessage}</p>}
+
+        {!readOnly && !composeDisabledMessage && (
           <div className="chat-compose">
             <input
               type="text"
