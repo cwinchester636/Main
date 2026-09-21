@@ -1,6 +1,7 @@
 import { error, json, newId, matchKey, requireNotSuspended } from '../utils.js'
 import { getRatingSummaries } from './ratings.js'
 import { notifyAccount } from '../push.js'
+import { isBlockedEitherWay } from './blocks.js'
 
 // "completed" isn't a stored status value — it's derived from both
 // confirmation timestamps being set on an accepted trade. See
@@ -105,6 +106,14 @@ export async function proposeTrade(request, env, account, ctx) {
     .first()
   if (!target) return error('account not found', 404)
   if (target.suspended_at) return error('that account has been suspended and can’t receive new trades', 403)
+
+  // Checked both directions — either side having blocked the other stops a
+  // *new* proposal starting between them, regardless of who blocked whom.
+  // Neutral wording deliberately doesn't confirm which of them did the
+  // blocking. See worker/src/routes/blocks.js.
+  if (await isBlockedEitherWay(env, account.id, body.toAccountId)) {
+    return error('this collector isn’t accepting new trades from you right now', 403)
+  }
 
   const existing = await env.DB.prepare(
     `SELECT * FROM trade_proposals
@@ -217,16 +226,39 @@ export async function getTrades(env, account) {
 }
 
 export async function respondToTrade(request, env, account, tradeId, ctx) {
-  const suspended = requireNotSuspended(account)
-  if (suspended) return suspended
-
   const body = await request.json().catch(() => null)
-  if (!body || (body.action !== 'accept' && body.action !== 'decline')) {
-    return error('action must be "accept" or "decline"')
+  if (!body || !['accept', 'decline', 'cancel'].includes(body.action)) {
+    return error('action must be "accept", "decline", or "cancel"')
   }
 
   const row = await env.DB.prepare('SELECT * FROM trade_proposals WHERE id = ?').bind(tradeId).first()
   if (!row) return error('trade not found', 404)
+
+  // Withdrawing your own proposal, not entering into or completing a trade
+  // — deliberately allowed even while suspended, unlike accept/decline
+  // below (requireNotSuspended is specifically about trading/messaging,
+  // and backing out of your own trade is the opposite of that).
+  if (body.action === 'cancel') {
+    if (row.from_account_id !== account.id) return error('only the proposer can cancel this trade', 403)
+    if (row.status !== 'pending') return error(`trade is already ${row.status}`)
+
+    await env.DB.prepare('UPDATE trade_proposals SET status = ? WHERE id = ?').bind('cancelled', tradeId).run()
+
+    ctx?.waitUntil(
+      notifyAccount(env, row.to_account_id, {
+        title: 'Trade cancelled',
+        body: `${account.username} cancelled their trade proposal`,
+        tag: `trade-${tradeId}`,
+        linkTab: 'trades',
+      }),
+    )
+
+    return json({ proposal: { ...row, status: 'cancelled' } })
+  }
+
+  const suspended = requireNotSuspended(account)
+  if (suspended) return suspended
+
   if (row.to_account_id !== account.id) return error('only the recipient can respond to this trade', 403)
   if (row.status !== 'pending') return error(`trade is already ${row.status}`)
 

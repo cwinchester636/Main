@@ -16,6 +16,7 @@ const STATUS_LABEL = {
   pending: 'Awaiting response',
   accepted: 'Accepted — coordinate the swap',
   declined: 'Declined',
+  cancelled: 'Cancelled',
   completed: 'Trade completed',
 }
 
@@ -23,7 +24,7 @@ function formatDate(ts) {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function TradeCard({ trade, direction, match, onRespond, onConfirm, token, currentAccountId, isSuspended }) {
+function TradeCard({ trade, direction, match, onRespond, onConfirm, onBlock, token, currentAccountId, isSuspended }) {
   const { counterparty, status } = trade
   const [checkingValue, setCheckingValue] = useState(false)
   const [disparity, setDisparity] = useState(null)
@@ -34,7 +35,17 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
   const [rateOpen, setRateOpen] = useState(false)
   const [myRating, setMyRating] = useState(trade.myRating)
   const [viewingRatings, setViewingRatings] = useState(false)
+  const [blocking, setBlocking] = useState(false)
   const cashAmount = Number(cashInput) || 0
+
+  const handleBlock = async () => {
+    if (!window.confirm(`Block ${counterparty.username}? They won't be able to propose new trades to you, and you won't see them as a match anymore.`)) {
+      return
+    }
+    setBlocking(true)
+    await onBlock(counterparty.id)
+    setBlocking(false)
+  }
 
   const handleAcceptClick = async () => {
     // No current match data for this counterparty (e.g. the overlapping
@@ -89,7 +100,12 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
       )}
 
       {status === 'pending' && direction === 'sent' && (
-        <p className="trade-hint">Waiting for {counterparty.username} to respond.</p>
+        <div className="trade-actions-column">
+          <p className="trade-hint">Waiting for {counterparty.username} to respond.</p>
+          <button type="button" className="button secondary" onClick={() => onRespond(trade.id, 'cancel')}>
+            Cancel proposal
+          </button>
+        </div>
       )}
 
       {status === 'accepted' && !trade.confirmedByMe && !isSuspended && (
@@ -126,6 +142,9 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
         <button type="button" className="link-button" onClick={() => setChatOpen(true)}>💬 Chat</button>
         <button type="button" className="link-button danger" onClick={() => setReportOpen(true)}>
           ⚠️ Report an issue
+        </button>
+        <button type="button" className="link-button danger" disabled={blocking} onClick={handleBlock}>
+          {blocking ? 'Blocking…' : `🚫 Block ${counterparty.username}`}
         </button>
       </div>
 
@@ -198,7 +217,7 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, token, curre
   )
 }
 
-export default function TradesView({ trades, matches, onRespond, onConfirm, token, currentAccountId, isSuspended }) {
+export default function TradesView({ trades, matches, onRespond, onConfirm, onBlock, token, currentAccountId, isSuspended }) {
   const { sent, received } = trades
   const hasAny = sent.length > 0 || received.length > 0
   const matchByAccountId = (accountId) => matches.find((m) => m.account.id === accountId)
@@ -232,6 +251,7 @@ export default function TradesView({ trades, matches, onRespond, onConfirm, toke
                 match={matchByAccountId(trade.counterparty.id)}
                 onRespond={onRespond}
                 onConfirm={onConfirm}
+                onBlock={onBlock}
                 token={token}
                 currentAccountId={currentAccountId}
                 isSuspended={isSuspended}
@@ -253,6 +273,7 @@ export default function TradesView({ trades, matches, onRespond, onConfirm, toke
                 match={matchByAccountId(trade.counterparty.id)}
                 onRespond={onRespond}
                 onConfirm={onConfirm}
+                onBlock={onBlock}
                 token={token}
                 currentAccountId={currentAccountId}
                 isSuspended={isSuspended}

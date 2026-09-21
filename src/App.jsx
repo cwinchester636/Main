@@ -142,6 +142,19 @@ export default function App() {
     setEvents((prev) => prev.filter((e) => e.id !== eventId))
   }
 
+  // Shared by both blocking (Matches/Trades) and unblocking (Profile's
+  // blocked-users list) -- same toggle endpoint either way. Refetches
+  // matches and trades since blocking affects both: the blocked account
+  // stops appearing as a match, and any trade either side had pending
+  // with the other gets auto-declined server-side.
+  const toggleBlock = async (accountId) => {
+    const result = await api.toggleBlock(token, accountId)
+    const [matchData, tradeData] = await Promise.all([api.getMatches(token), api.getTrades(token)])
+    setMatches(matchData.matches)
+    setTrades(tradeData)
+    return result
+  }
+
   // Opening the inbox is treated as "seen" for the whole list, same as most
   // notification inboxes — see worker/src/routes/notifications.js
   // markNotificationsRead. The badge clears immediately rather than waiting
@@ -193,6 +206,7 @@ export default function App() {
               hasWants={wants.length > 0}
               proposedAccountIds={proposedAccountIds}
               onPropose={proposeTrade}
+              onBlock={toggleBlock}
               token={token}
               isSuspended={account.isSuspended}
             />
@@ -203,6 +217,7 @@ export default function App() {
               matches={matches}
               onRespond={respondToTrade}
               onConfirm={confirmTrade}
+              onBlock={toggleBlock}
               token={token}
               currentAccountId={account.id}
               isSuspended={account.isSuspended}
@@ -222,7 +237,13 @@ export default function App() {
             <AdminView token={token} currentAccountId={account.id} />
           )}
           {tab === 'profile' && (
-            <ProfileView account={account} token={token} onUpdate={updateProfile} onLogOut={logOut} />
+            <ProfileView
+              account={account}
+              token={token}
+              onUpdate={updateProfile}
+              onLogOut={logOut}
+              onToggleBlock={toggleBlock}
+            />
           )}
         </main>
         <BottomNav

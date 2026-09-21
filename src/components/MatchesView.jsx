@@ -9,13 +9,14 @@ import RatingsListModal from './RatingsListModal.jsx'
 import { distanceLabel } from '../utils/distance.js'
 import { checkValueDisparity } from '../utils/tradeValue.js'
 
-function MatchCard({ match, isProposed, onPropose, token, isSuspended }) {
+function MatchCard({ match, isProposed, onPropose, onBlock, token, isSuspended }) {
   const [open, setOpen] = useState(false)
   const [proposing, setProposing] = useState(false)
   const [checkingValue, setCheckingValue] = useState(false)
   const [disparity, setDisparity] = useState(null)
   const [viewingPhotoId, setViewingPhotoId] = useState(null)
   const [viewingRatings, setViewingRatings] = useState(false)
+  const [blocking, setBlocking] = useState(false)
   const [cashInput, setCashInput] = useState('')
   const { account, theyHaveYouWant, youHaveTheyWant, isMutual } = match
   const proximityLabel = distanceLabel(match)
@@ -25,6 +26,15 @@ function MatchCard({ match, isProposed, onPropose, token, isSuspended }) {
     setProposing(true)
     await onPropose(account.id, cashAmount)
     setProposing(false)
+  }
+
+  const handleBlock = async () => {
+    if (!window.confirm(`Block ${account.username}? They won't be able to propose new trades to you, and you won't see them as a match anymore.`)) {
+      return
+    }
+    setBlocking(true)
+    await onBlock(account.id)
+    setBlocking(false)
   }
 
   const handleProposeClick = async () => {
@@ -109,6 +119,10 @@ function MatchCard({ match, isProposed, onPropose, token, isSuspended }) {
               </button>
             </>
           )}
+
+          <button type="button" className="link-button danger" disabled={blocking} onClick={handleBlock}>
+            {blocking ? 'Blocking…' : `🚫 Block ${account.username}`}
+          </button>
         </div>
       )}
 
@@ -144,7 +158,7 @@ function MatchCard({ match, isProposed, onPropose, token, isSuspended }) {
   )
 }
 
-export default function MatchesView({ matches, hasHaves, hasWants, proposedAccountIds, onPropose, token, isSuspended }) {
+export default function MatchesView({ matches, hasHaves, hasWants, proposedAccountIds, onPropose, onBlock, token, isSuspended }) {
   if (!hasHaves || !hasWants) {
     return (
       <div className="view">
@@ -174,6 +188,7 @@ export default function MatchesView({ matches, hasHaves, hasWants, proposedAccou
             token={token}
             isProposed={proposedAccountIds.includes(match.account.id)}
             onPropose={onPropose}
+            onBlock={onBlock}
             isSuspended={isSuspended}
           />
         ))}

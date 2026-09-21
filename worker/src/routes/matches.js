@@ -35,15 +35,25 @@ export async function computeMatches(env, account) {
   // A suspended account can't complete a trade with anyone (see
   // requireNotSuspended), so it never shows up as a potential match —
   // proposing to someone you can never actually trade with is just a
-  // dead end dressed up as an opportunity.
+  // dead end dressed up as an opportunity. A blocked account is excluded
+  // the same way and for the same reason (see worker/src/routes/blocks.js)
+  // — either side blocking the other means neither can propose a new
+  // trade to the other, so showing them as a match would be equally
+  // misleading; checked both directions since a block is one-directional
+  // but its match-hiding effect isn't.
   const others = await env.DB.prepare(
     `SELECT ci.*, a.username AS acct_username, a.avatar AS acct_avatar, a.zip AS acct_zip,
             a.lat AS acct_lat, a.lng AS acct_lng
      FROM collection_items ci
      JOIN accounts a ON a.id = ci.account_id
-     WHERE ci.account_id != ? AND a.suspended_at IS NULL`,
+     WHERE ci.account_id != ? AND a.suspended_at IS NULL
+       AND ci.account_id NOT IN (
+         SELECT blocked_account_id FROM account_blocks WHERE blocker_account_id = ?
+         UNION
+         SELECT blocker_account_id FROM account_blocks WHERE blocked_account_id = ?
+       )`,
   )
-    .bind(account.id)
+    .bind(account.id, account.id, account.id)
     .all()
 
   const byAccount = new Map()

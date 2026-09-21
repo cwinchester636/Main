@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import AvatarPicker from './AvatarPicker.jsx'
-import { ApiError } from '../api/client.js'
+import { api, ApiError } from '../api/client.js'
 import {
   getExistingSubscription,
   isPushSupported,
@@ -11,13 +11,38 @@ import {
 
 const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250]
 
-export default function ProfileView({ account, token, onUpdate, onLogOut }) {
+export default function ProfileView({ account, token, onUpdate, onLogOut, onToggleBlock }) {
   const [avatar, setAvatar] = useState(account.avatar)
   const [zip, setZip] = useState(account.zip || '')
   const [radiusMiles, setRadiusMiles] = useState(account.radiusMiles ?? null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+
+  const [blockedUsers, setBlockedUsers] = useState(null)
+  const [unblockingId, setUnblockingId] = useState(null)
+  const [blockedError, setBlockedError] = useState('')
+
+  useEffect(() => {
+    api
+      .getBlockedUsers(token)
+      .then(({ blocked }) => setBlockedUsers(blocked))
+      .catch(() => setBlockedUsers([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleUnblock = async (user) => {
+    setUnblockingId(user.id)
+    setBlockedError('')
+    try {
+      await onToggleBlock(user.id)
+      setBlockedUsers((prev) => prev.filter((u) => u.id !== user.id))
+    } catch (err) {
+      setBlockedError(err instanceof ApiError ? err.message : 'Could not unblock this account.')
+    } finally {
+      setUnblockingId(null)
+    }
+  }
 
   // 'unsupported' | 'checking' | 'off' | 'on' — checked once against the
   // browser's actual subscription state rather than assumed, since it can
@@ -172,6 +197,31 @@ export default function ProfileView({ account, token, onUpdate, onLogOut }) {
           </div>
         )}
       </div>
+
+      {blockedUsers && blockedUsers.length > 0 && (
+        <div className="profile-section">
+          <h2>Blocked users</h2>
+          <p className="section-hint">
+            They can't propose new trades to you and you won't see them as a match — unblock to reverse this.
+          </p>
+          {blockedError && <p className="form-error">{blockedError}</p>}
+          <div className="blocked-user-list">
+            {blockedUsers.map((user) => (
+              <div key={user.id} className="blocked-user-row">
+                <strong>{user.username}</strong>
+                <button
+                  type="button"
+                  className="button small secondary"
+                  disabled={unblockingId === user.id}
+                  onClick={() => handleUnblock(user)}
+                >
+                  {unblockingId === user.id ? '…' : 'Unblock'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="danger-zone">
         <h2>Log out</h2>

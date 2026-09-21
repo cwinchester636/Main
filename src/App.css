@@ -859,7 +859,8 @@
   color: var(--success);
 }
 
-.trade-status-badge.status-declined {
+.trade-status-badge.status-declined,
+.trade-status-badge.status-cancelled {
   background: var(--danger-soft);
   color: var(--danger);
 }
@@ -951,6 +952,24 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 10px 12px;
+  background: #fff;
+}
+
+.blocked-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.blocked-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
   background: #fff;
 }
 

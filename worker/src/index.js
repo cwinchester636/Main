@@ -11,6 +11,7 @@ import { rateTrade, getRatingsForAccount } from './routes/ratings.js'
 import { subscribe, unsubscribe } from './push.js'
 import { listEvents, createEvent, deleteEvent, toggleRsvp } from './routes/events.js'
 import { listNotifications, markNotificationsRead } from './routes/notifications.js'
+import { listBlocked, toggleBlock } from './routes/blocks.js'
 
 export default {
   async fetch(request, env, ctx) {
@@ -82,6 +83,12 @@ export default {
       if (accountRatingsMatch && request.method === 'GET') {
         return await getRatingsForAccount(env, accountRatingsMatch[1])
       }
+      const accountBlockMatch = path.match(/^\/api\/accounts\/([^/]+)\/block$/)
+      if (accountBlockMatch && request.method === 'POST') {
+        return await toggleBlock(env, account, accountBlockMatch[1])
+      }
+
+      if (path === '/api/blocked' && request.method === 'GET') return await listBlocked(env, account)
 
       if (path === '/api/events' && request.method === 'GET') return await listEvents(env, account)
       if (path === '/api/events' && request.method === 'POST') return await createEvent(request, env, account, ctx)

@@ -106,4 +106,7 @@ export const api = {
 
   getNotifications: (token) => request('/api/notifications', { token }),
   markNotificationsRead: (token) => request('/api/notifications/read', { method: 'PATCH', token }),
+
+  toggleBlock: (token, accountId) => request(`/api/accounts/${accountId}/block`, { method: 'POST', token }),
+  getBlockedUsers: (token) => request('/api/blocked', { token }),
 }
