@@ -127,11 +127,16 @@ export async function deleteUser(env, account, targetId) {
   // (not deleted — the referred account itself is a real, separate
   // account and stays) rather than left pointing at a now-nonexistent id,
   // same "explicit, not relying on the unenforced ON DELETE SET NULL"
-  // reasoning as everything else here.
+  // reasoning as everything else here. sessions (see migrations/
+  // 0022_sessions.sql) is deleted by account_id, not by any specific
+  // token — every device this account was ever logged into loses access
+  // the moment the account itself is gone, which is the correct behavior
+  // regardless of how many sessions existed.
   await env.DB.batch([
     env.DB.prepare('UPDATE accounts SET referred_by_account_id = NULL WHERE referred_by_account_id = ?').bind(
       targetId,
     ),
+    env.DB.prepare('DELETE FROM sessions WHERE account_id = ?').bind(targetId),
     env.DB.prepare('DELETE FROM collection_items WHERE account_id = ?').bind(targetId),
     env.DB.prepare('DELETE FROM push_subscriptions WHERE account_id = ?').bind(targetId),
     env.DB.prepare('DELETE FROM known_matches WHERE account_id_a = ? OR account_id_b = ?').bind(targetId, targetId),

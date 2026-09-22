@@ -1,6 +1,6 @@
 import { authenticate } from './auth.js'
 import { error, handleOptions } from './utils.js'
-import { createAccount, login, getMe, updateMe } from './routes/accounts.js'
+import { createAccount, login, logOut, getMe, updateMe } from './routes/accounts.js'
 import { getCollection, addCollectionItem, deleteCollectionItem, getCollectionItemPhoto } from './routes/collection.js'
 import { getMatches } from './routes/matches.js'
 import { proposeTrade, getTrades, respondToTrade, confirmTrade } from './routes/trades.js'
@@ -37,6 +37,7 @@ export default {
       if (path === '/api/me' && request.method === 'GET') return getMe(account, env)
       if (path === '/api/me' && request.method === 'PATCH') return await updateMe(request, env, account)
       if (path === '/api/me/pro/verify' && request.method === 'POST') return await verifyProPurchase(env, account)
+      if (path === '/api/logout' && request.method === 'POST') return await logOut(request, env, account)
 
       if (path === '/api/collection' && request.method === 'GET') return await getCollection(env, account)
       if (path === '/api/collection' && request.method === 'POST') {

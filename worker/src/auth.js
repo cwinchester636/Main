@@ -1,12 +1,29 @@
 import { hashToken, isPro } from './utils.js'
 
-export async function authenticate(request, env) {
+// Shared by authenticate() below and the logout route (worker/src/routes/
+// accounts.js) -- logout needs the exact same hash authenticate() would
+// compute, to delete the one sessions row for *this* request's token
+// without touching any of the account's other active sessions.
+export async function getTokenHash(request) {
   const header = request.headers.get('Authorization') || ''
   const match = header.match(/^Bearer (.+)$/)
   if (!match) return null
+  return hashToken(match[1])
+}
 
-  const tokenHash = await hashToken(match[1])
-  const row = await env.DB.prepare('SELECT * FROM accounts WHERE token_hash = ?')
+// A row in `sessions` (not accounts.token_hash, which is no longer used
+// for auth -- see migrations/0022_sessions.sql) is what makes a login
+// valid. Multiple rows for the same account_id are expected and normal --
+// one per device/browser that's ever logged in and hasn't logged out.
+export async function authenticate(request, env) {
+  const tokenHash = await getTokenHash(request)
+  if (!tokenHash) return null
+
+  const row = await env.DB.prepare(
+    `SELECT accounts.* FROM sessions
+     JOIN accounts ON accounts.id = sessions.account_id
+     WHERE sessions.token_hash = ?`,
+  )
     .bind(tokenHash)
     .first()
   return row ?? null

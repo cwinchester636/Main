@@ -10,7 +10,7 @@ import {
   FREE_MAX_RADIUS_MILES,
   normalizeEmailForFraudCheck,
 } from '../utils.js'
-import { publicAccount } from '../auth.js'
+import { publicAccount, getTokenHash } from '../auth.js'
 import { geocodeZip } from '../geocode.js'
 import { isAdminUsername } from '../admin.js'
 
@@ -124,12 +124,17 @@ export async function createAccount(request, env) {
   const { hash: passwordHash, salt: passwordSalt } = await hashPassword(password)
   const coords = await geocodeZip(zip)
 
-  await env.DB.prepare(
-    `INSERT INTO accounts
-       (id, username, token_hash, email, password_hash, password_salt, avatar, zip, lat, lng, radius_miles, created_at, referred_by_account_id, signup_ip)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  )
-    .bind(
+  const createdAt = Date.now()
+  await env.DB.batch([
+    // tokenHash written here satisfies the column's NOT NULL UNIQUE
+    // constraint only -- it's never read back for authentication anymore
+    // (see migrations/0022_sessions.sql). The sessions row right below is
+    // what actually makes this account's first login valid.
+    env.DB.prepare(
+      `INSERT INTO accounts
+         (id, username, token_hash, email, password_hash, password_salt, avatar, zip, lat, lng, radius_miles, created_at, referred_by_account_id, signup_ip)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
       id,
       username,
       tokenHash,
@@ -141,11 +146,17 @@ export async function createAccount(request, env) {
       coords?.lat ?? null,
       coords?.lng ?? null,
       radiusMiles,
-      Date.now(),
+      createdAt,
       referredByAccountId,
       signupIp,
-    )
-    .run()
+    ),
+    env.DB.prepare('INSERT INTO sessions (id, account_id, token_hash, created_at) VALUES (?, ?, ?, ?)').bind(
+      newId(),
+      id,
+      tokenHash,
+      createdAt,
+    ),
+  ])
 
   return json(
     {
@@ -166,11 +177,13 @@ export async function createAccount(request, env) {
   )
 }
 
-// Logging in issues a *new* token and overwrites the account's stored one
-// — token_hash is UNIQUE per account (one active session), so signing in
-// on a new device invalidates whatever session was active elsewhere. That
-// tradeoff (vs. a separate multi-session table) matches this app's
-// existing single-token-per-account model; see README.
+// Logging in issues a new token and adds it as a new row in `sessions` --
+// it deliberately does NOT touch any of this account's other existing
+// sessions. A user stays signed in on every device they've logged into
+// until they explicitly log out from that specific device (see logOut
+// below) or an admin deletes the account; logging in from a second device
+// no longer silently signs them out of the first one. See README "Session
+// persistence".
 export async function login(request, env) {
   const body = await request.json().catch(() => null)
   const identifier = typeof body?.usernameOrEmail === 'string' ? body.usernameOrEmail.trim() : ''
@@ -190,9 +203,27 @@ export async function login(request, env) {
 
   const token = generateToken()
   const tokenHash = await hashToken(token)
-  await env.DB.prepare('UPDATE accounts SET token_hash = ? WHERE id = ?').bind(tokenHash, row.id).run()
+  await env.DB.prepare('INSERT INTO sessions (id, account_id, token_hash, created_at) VALUES (?, ?, ?, ?)')
+    .bind(newId(), row.id, tokenHash, Date.now())
+    .run()
 
   return json({ account: { ...publicAccount(row), isAdmin: isAdminUsername(row.username, env) }, token })
+}
+
+// Ends only *this* request's own session -- the one whose token is in the
+// Authorization header -- never any of the account's other active
+// sessions on other devices. That's the explicit "I chose to log out"
+// action; simply closing the app or clearing local storage doesn't call
+// this at all, and correctly leaves the session valid for whenever the
+// app is reopened. See README "Session persistence".
+export async function logOut(request, env, account) {
+  const tokenHash = await getTokenHash(request)
+  if (tokenHash) {
+    await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ? AND account_id = ?')
+      .bind(tokenHash, account.id)
+      .run()
+  }
+  return json({ loggedOut: true })
 }
 
 export function getMe(account, env) {

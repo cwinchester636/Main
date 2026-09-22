@@ -51,6 +51,7 @@ async function fetchBlob(path, token) {
 export const api = {
   createAccount: (body) => request('/api/accounts', { method: 'POST', body }),
   login: (body) => request('/api/login', { method: 'POST', body }),
+  logOut: (token) => request('/api/logout', { method: 'POST', token }),
   getMe: (token) => request('/api/me', { token }),
   updateMe: (token, body) => request('/api/me', { method: 'PATCH', token, body }),
   verifyProPurchase: (token) => request('/api/me/pro/verify', { method: 'POST', token }),

@@ -114,7 +114,15 @@ export default function App() {
     setAccount(fresh)
   }
 
+  // Tapping "Log out" is the one thing that should actually end a session
+  // server-side (see worker/src/routes/accounts.js logOut) -- everything
+  // else (closing the app, clearing local storage some other way) leaves
+  // this device's session valid, so reopening the app later doesn't
+  // require signing in again. Best-effort: if the request fails (offline,
+  // etc.), the local session still clears -- someone who tapped "Log out"
+  // should never be stuck looking logged in.
   const logOut = () => {
+    api.logOut(token).catch(() => {})
     setToken(null)
     setAccount(null)
     setAuthStatus('anonymous')
