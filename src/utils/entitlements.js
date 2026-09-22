@@ -3,4 +3,4 @@
 // only going to be rejected, but the server enforces the real limit
 // regardless of what the client thinks. See README "Pro tier / paywall".
 export const FREE_COLLECTION_LIMIT = 25
-export const FREE_MAX_RADIUS_MILES = 100
+export const FREE_MAX_RADIUS_MILES = 5

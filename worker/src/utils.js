@@ -47,7 +47,7 @@ export function isPro(row) {
 // addCollectionItem (collection.js), updateMe (accounts.js), and subscribe
 // (push.js). Never trust a client-side check alone for these.
 export const FREE_COLLECTION_LIMIT = 25
-export const FREE_MAX_RADIUS_MILES = 100
+export const FREE_MAX_RADIUS_MILES = 5
 
 export function newId() {
   return crypto.randomUUID()
