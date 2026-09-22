@@ -1,4 +1,4 @@
-import { json, matchKey, zipProximity, haversineMiles } from '../utils.js'
+import { json, matchKey, zipProximity, haversineMiles, isPro } from '../utils.js'
 import { getRatingSummaries } from './ratings.js'
 
 function serializeCard(row) {
@@ -43,7 +43,7 @@ export async function computeMatches(env, account) {
   // but its match-hiding effect isn't.
   const others = await env.DB.prepare(
     `SELECT ci.*, a.username AS acct_username, a.avatar AS acct_avatar, a.zip AS acct_zip,
-            a.lat AS acct_lat, a.lng AS acct_lng
+            a.lat AS acct_lat, a.lng AS acct_lng, a.pro_until AS acct_pro_until
      FROM collection_items ci
      JOIN accounts a ON a.id = ci.account_id
      WHERE ci.account_id != ? AND a.suspended_at IS NULL
@@ -65,7 +65,13 @@ export async function computeMatches(env, account) {
 
     if (!byAccount.has(row.account_id)) {
       byAccount.set(row.account_id, {
-        account: { id: row.account_id, username: row.acct_username, avatar: row.acct_avatar, zip: row.acct_zip },
+        account: {
+          id: row.account_id,
+          username: row.acct_username,
+          avatar: row.acct_avatar,
+          zip: row.acct_zip,
+          isPro: isPro({ pro_until: row.acct_pro_until }),
+        },
         lat: row.acct_lat,
         lng: row.acct_lng,
         theyHaveYouWant: new Map(),

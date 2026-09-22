@@ -2,10 +2,14 @@ import { useState } from 'react'
 import CardChip from './CardChip.jsx'
 import CardPicker from './CardPicker.jsx'
 import PhotoViewerModal from './PhotoViewerModal.jsx'
+import PaywallModal from './PaywallModal.jsx'
+import { FREE_COLLECTION_LIMIT } from '../utils/entitlements.js'
 
-function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove, onViewPhoto }) {
+function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove, onViewPhoto, isPro }) {
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [paywallOpen, setPaywallOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const atLimit = !isPro && cards.length >= FREE_COLLECTION_LIMIT
 
   return (
     <section className="collection-section">
@@ -14,10 +18,21 @@ function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove
           <h2>{title}</h2>
           <p className="section-hint">{hint}</p>
         </div>
-        <button type="button" className="button secondary small" onClick={() => setPickerOpen(true)} disabled={busy}>
-          + Add Card
+        <button
+          type="button"
+          className="button secondary small"
+          onClick={() => (atLimit ? setPaywallOpen(true) : setPickerOpen(true))}
+          disabled={busy}
+        >
+          {atLimit ? '🔒 + Add Card' : '+ Add Card'}
         </button>
       </div>
+
+      {atLimit && (
+        <p className="section-hint">
+          Free accounts can have up to {FREE_COLLECTION_LIMIT} cards here — remove one, or upgrade to Pro for unlimited.
+        </p>
+      )}
 
       {cards.length === 0 ? (
         <p className="empty-hint">Nothing here yet — add a few cards to get started.</p>
@@ -52,11 +67,18 @@ function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove
           onClose={() => setPickerOpen(false)}
         />
       )}
+
+      {paywallOpen && (
+        <PaywallModal
+          reason={`Free accounts can have up to ${FREE_COLLECTION_LIMIT} cards in ${title.toLowerCase()}.`}
+          onClose={() => setPaywallOpen(false)}
+        />
+      )}
     </section>
   )
 }
 
-export default function CollectionView({ haves, wants, onAdd, onRemove, token }) {
+export default function CollectionView({ haves, wants, onAdd, onRemove, token, isPro }) {
   const [viewingPhotoId, setViewingPhotoId] = useState(null)
 
   return (
@@ -75,6 +97,7 @@ export default function CollectionView({ haves, wants, onAdd, onRemove, token })
         onAdd={onAdd}
         onRemove={onRemove}
         onViewPhoto={setViewingPhotoId}
+        isPro={isPro}
       />
 
       <CardSection
@@ -83,6 +106,7 @@ export default function CollectionView({ haves, wants, onAdd, onRemove, token })
         listType="want"
         cards={wants}
         otherCards={haves}
+        isPro={isPro}
         onAdd={onAdd}
         onRemove={onRemove}
       />

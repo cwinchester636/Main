@@ -197,7 +197,14 @@ export default function App() {
             <HomeView account={account} haves={haves} wants={wants} matches={matches} onNavigate={setTab} />
           )}
           {tab === 'collection' && (
-            <CollectionView haves={haves} wants={wants} onAdd={addCard} onRemove={removeCard} token={token} />
+            <CollectionView
+              haves={haves}
+              wants={wants}
+              onAdd={addCard}
+              onRemove={removeCard}
+              token={token}
+              isPro={account.isPro}
+            />
           )}
           {tab === 'matches' && (
             <MatchesView

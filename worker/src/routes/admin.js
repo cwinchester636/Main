@@ -1,4 +1,4 @@
-import { error, json, servePhoto } from '../utils.js'
+import { error, json, servePhoto, isPro } from '../utils.js'
 import { isAdminUsername } from '../admin.js'
 import { deriveStatus, completedAt } from './trades.js'
 import { getRatingSummaries } from './ratings.js'
@@ -28,7 +28,7 @@ function serializeSnapshotCard(row) {
 // anything that could authenticate as them.
 export async function listUsers(env) {
   const rows = await env.DB.prepare(
-    'SELECT id, username, email, avatar, zip, created_at, suspended_at FROM accounts ORDER BY created_at ASC LIMIT 500',
+    'SELECT id, username, email, avatar, zip, created_at, suspended_at, pro_until FROM accounts ORDER BY created_at ASC LIMIT 500',
   ).all()
 
   const ratingSummaries = await getRatingSummaries(env, rows.results.map((row) => row.id))
@@ -43,6 +43,8 @@ export async function listUsers(env) {
       createdAt: row.created_at,
       isSuspended: !!row.suspended_at,
       suspendedAt: row.suspended_at,
+      isPro: isPro(row),
+      proUntil: row.pro_until,
       rating: ratingSummaries.get(row.id) ?? { positivePct: null, count: 0 },
     })),
   })
@@ -70,6 +72,27 @@ export async function setUserSuspended(request, env, account, targetId) {
     .run()
 
   return json({ id: targetId, isSuspended: body.suspended })
+}
+
+// Real billing (StoreKit / Google Play Billing, via a Capacitor plugin like
+// RevenueCat) isn't wired up yet — see README "Pro tier / paywall" and
+// "Mobile app (Capacitor)". This is the stand-in for "how does someone
+// become Pro" until it is: an admin grants a year at a time (not forever —
+// pro_until is a real expiring timestamp even here, so this can't be
+// mistaken for a permanent flag once real subscriptions exist alongside
+// it) or revokes it outright. Doubles as the only way to exercise the Pro
+// gates end-to-end without a real purchase.
+export async function setUserPro(request, env, account, targetId) {
+  const body = await request.json().catch(() => null)
+  if (!body || typeof body.pro !== 'boolean') return error('pro (true/false) is required')
+
+  const target = await env.DB.prepare('SELECT id FROM accounts WHERE id = ?').bind(targetId).first()
+  if (!target) return error('user not found', 404)
+
+  const proUntil = body.pro ? Date.now() + 365 * 24 * 60 * 60 * 1000 : null
+  await env.DB.prepare('UPDATE accounts SET pro_until = ? WHERE id = ?').bind(proUntil, targetId).run()
+
+  return json({ id: targetId, isPro: body.pro, proUntil })
 }
 
 export async function deleteUser(env, account, targetId) {
@@ -149,8 +172,8 @@ export async function deleteUser(env, account, targetId) {
 // since been edited or removed from either collection.
 export async function listTrades(env) {
   const trades = await env.DB.prepare(
-    `SELECT tp.*, fa.username AS from_username, fa.email AS from_email, fa.avatar AS from_avatar, fa.suspended_at AS from_suspended_at,
-            ta.username AS to_username, ta.email AS to_email, ta.avatar AS to_avatar, ta.suspended_at AS to_suspended_at
+    `SELECT tp.*, fa.username AS from_username, fa.email AS from_email, fa.avatar AS from_avatar, fa.suspended_at AS from_suspended_at, fa.pro_until AS from_pro_until,
+            ta.username AS to_username, ta.email AS to_email, ta.avatar AS to_avatar, ta.suspended_at AS to_suspended_at, ta.pro_until AS to_pro_until
      FROM trade_proposals tp
      JOIN accounts fa ON fa.id = tp.from_account_id
      JOIN accounts ta ON ta.id = tp.to_account_id
@@ -194,6 +217,7 @@ export async function listTrades(env) {
           email: row.from_email,
           avatar: row.from_avatar,
           isSuspended: !!row.from_suspended_at,
+          isPro: isPro({ pro_until: row.from_pro_until }),
           rating: ratingSummaries.get(row.from_account_id) ?? { positivePct: null, count: 0 },
         },
         to: {
@@ -202,6 +226,7 @@ export async function listTrades(env) {
           email: row.to_email,
           avatar: row.to_avatar,
           isSuspended: !!row.to_suspended_at,
+          isPro: isPro({ pro_until: row.to_pro_until }),
           rating: ratingSummaries.get(row.to_account_id) ?? { positivePct: null, count: 0 },
         },
         fromOffered: cards.filter((c) => c.owner_account_id === row.from_account_id).map(serializeSnapshotCard),

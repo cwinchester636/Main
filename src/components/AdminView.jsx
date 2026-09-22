@@ -38,6 +38,7 @@ function AdminUsers({ token, currentAccountId }) {
   const [error, setError] = useState('')
   const [deletingId, setDeletingId] = useState(null)
   const [suspendingId, setSuspendingId] = useState(null)
+  const [proTogglingId, setProTogglingId] = useState(null)
   const [viewingRatingsFor, setViewingRatingsFor] = useState(null)
 
   const load = async () => {
@@ -70,6 +71,27 @@ function AdminUsers({ token, currentAccountId }) {
       setError(err instanceof ApiError ? err.message : 'Could not delete user.')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleTogglePro = async (user) => {
+    const nextPro = !user.isPro
+    const confirmed = window.confirm(
+      nextPro
+        ? `Grant ${user.username} Pro for one year? Real billing isn't wired up yet — this is a manual admin grant (see README "Pro tier / paywall").`
+        : `Revoke ${user.username}'s Pro access?`,
+    )
+    if (!confirmed) return
+
+    setProTogglingId(user.id)
+    setError('')
+    try {
+      await api.adminSetUserPro(token, user.id, nextPro)
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isPro: nextPro } : u)))
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not update this account.')
+    } finally {
+      setProTogglingId(null)
     }
   }
 
@@ -110,6 +132,7 @@ function AdminUsers({ token, currentAccountId }) {
               <span className="admin-user-text">
                 <span className="match-name-row">
                   <strong>{user.username}</strong>
+                  {user.isPro && <span className="pro-badge">⭐ Pro</span>}
                   {user.isSuspended && <span className="trade-status-badge status-declined">Suspended</span>}
                 </span>
                 <span className="section-hint">{user.email || 'no email'} · joined {formatDate(user.createdAt)}</span>
@@ -119,6 +142,14 @@ function AdminUsers({ token, currentAccountId }) {
                 <span className="admin-user-you">you</span>
               ) : (
                 <span className="admin-user-actions">
+                  <button
+                    type="button"
+                    className={`button small ${user.isPro ? 'danger' : 'secondary'}`}
+                    disabled={proTogglingId === user.id}
+                    onClick={() => handleTogglePro(user)}
+                  >
+                    {proTogglingId === user.id ? '…' : user.isPro ? 'Revoke Pro' : 'Grant Pro'}
+                  </button>
                   <button
                     type="button"
                     className={`button small ${user.isSuspended ? 'secondary' : 'danger'}`}
@@ -170,9 +201,11 @@ function AdminTradeCard({ trade, token }) {
 
       <p className="section-hint">
         <RatingBadge rating={trade.from.rating} onClick={() => setViewingRatingsFor(trade.from)} />
+        {trade.from.isPro && <span className="pro-badge">⭐ Pro</span>}
         {trade.from.isSuspended && <span className="trade-status-badge status-declined">Suspended</span>}
         {' vs '}
         <RatingBadge rating={trade.to.rating} onClick={() => setViewingRatingsFor(trade.to)} />
+        {trade.to.isPro && <span className="pro-badge">⭐ Pro</span>}
         {trade.to.isSuspended && <span className="trade-status-badge status-declined">Suspended</span>}
       </p>
 

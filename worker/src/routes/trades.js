@@ -1,4 +1,4 @@
-import { error, json, newId, matchKey, requireNotSuspended } from '../utils.js'
+import { error, json, newId, matchKey, requireNotSuspended, isPro } from '../utils.js'
 import { getRatingSummaries } from './ratings.js'
 import { notifyAccount } from '../push.js'
 import { isBlockedEitherWay } from './blocks.js'
@@ -166,8 +166,8 @@ export async function proposeTrade(request, env, account, ctx) {
 
 export async function getTrades(env, account) {
   const rows = await env.DB.prepare(
-    `SELECT tp.*, fa.username AS from_username, fa.avatar AS from_avatar,
-            ta.username AS to_username, ta.avatar AS to_avatar
+    `SELECT tp.*, fa.username AS from_username, fa.avatar AS from_avatar, fa.pro_until AS from_pro_until,
+            ta.username AS to_username, ta.avatar AS to_avatar, ta.pro_until AS to_pro_until
      FROM trade_proposals tp
      JOIN accounts fa ON fa.id = tp.from_account_id
      JOIN accounts ta ON ta.id = tp.to_account_id
@@ -216,6 +216,7 @@ export async function getTrades(env, account) {
         username: isFrom ? row.to_username : row.from_username,
         avatar: isFrom ? row.to_avatar : row.from_avatar,
         rating: ratingSummaries.get(counterpartyId) ?? { positivePct: null, count: 0 },
+        isPro: isPro({ pro_until: isFrom ? row.to_pro_until : row.from_pro_until }),
       },
     }
     if (isFrom) sent.push(entry)

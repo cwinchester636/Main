@@ -4,7 +4,7 @@ import { createAccount, login, getMe, updateMe } from './routes/accounts.js'
 import { getCollection, addCollectionItem, deleteCollectionItem, getCollectionItemPhoto } from './routes/collection.js'
 import { getMatches } from './routes/matches.js'
 import { proposeTrade, getTrades, respondToTrade, confirmTrade } from './routes/trades.js'
-import { requireAdmin, listUsers, deleteUser, listTrades, getTradeSnapshotPhoto, setUserSuspended } from './routes/admin.js'
+import { requireAdmin, listUsers, deleteUser, listTrades, getTradeSnapshotPhoto, setUserSuspended, setUserPro } from './routes/admin.js'
 import { getMessages, sendMessage } from './routes/messages.js'
 import { createReport, adminListReports, adminResolveReport } from './routes/reports.js'
 import { rateTrade, getRatingsForAccount } from './routes/ratings.js'
@@ -123,6 +123,10 @@ export default {
       const adminSuspendMatch = path.match(/^\/api\/admin\/users\/([^/]+)\/suspend$/)
       if (adminSuspendMatch && request.method === 'PATCH') {
         return requireAdmin(account, env) ?? (await setUserSuspended(request, env, account, adminSuspendMatch[1]))
+      }
+      const adminProMatch = path.match(/^\/api\/admin\/users\/([^/]+)\/pro$/)
+      if (adminProMatch && request.method === 'PATCH') {
+        return requireAdmin(account, env) ?? (await setUserPro(request, env, account, adminProMatch[1]))
       }
       if (path === '/api/admin/trades' && request.method === 'GET') {
         return requireAdmin(account, env) ?? (await listTrades(env))

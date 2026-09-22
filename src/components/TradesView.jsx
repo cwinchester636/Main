@@ -69,6 +69,7 @@ function TradeCard({ trade, direction, match, onRespond, onConfirm, onBlock, tok
         <span className="trade-summary-text">
           <span className="match-name-row">
             <strong>{counterparty.username}</strong>
+            {counterparty.isPro && <span className="pro-badge">⭐ Pro</span>}
             <RatingBadge rating={counterparty.rating} onClick={() => setViewingRatings(true)} />
           </span>
           <span className={`trade-status-badge status-${status}`}>{STATUS_LABEL[status]}</span>

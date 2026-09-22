@@ -8,6 +8,8 @@
   --primary-dark: #543dab;
   --primary-soft: #efe9fb;
   --accent: #eab308;
+  --accent-soft: #fdf3d8;
+  --accent-dark: #8a6200;
   --success: #1a9c6d;
   --success-soft: #e2f6ee;
   --danger: #d9483a;
@@ -863,6 +865,26 @@
 .trade-status-badge.status-cancelled {
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+.pro-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  white-space: nowrap;
+}
+
+.paywall-perks {
+  margin: 8px 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
 }
 
 .trade-actions-column {

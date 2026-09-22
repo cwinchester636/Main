@@ -89,6 +89,8 @@ export const api = {
   adminDeleteUser: (token, userId) => request(`/api/admin/users/${userId}`, { method: 'DELETE', token }),
   adminSetUserSuspended: (token, userId, suspended) =>
     request(`/api/admin/users/${userId}/suspend`, { method: 'PATCH', token, body: { suspended } }),
+  adminSetUserPro: (token, userId, pro) =>
+    request(`/api/admin/users/${userId}/pro`, { method: 'PATCH', token, body: { pro } }),
   adminListTrades: (token) => request('/api/admin/trades', { token }),
   adminFetchTradePhoto: (token, snapshotItemId) => fetchBlob(`/api/admin/trade-photos/${snapshotItemId}`, token),
   adminListReports: (token) => request('/api/admin/reports', { token }),

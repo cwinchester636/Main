@@ -1,6 +1,17 @@
 import { error, json, newId } from '../utils.js'
 import { deriveStatus } from './trades.js'
 
+// D1 rejects a query with too many bound parameters well below SQLite's own
+// desktop default (999) — confirmed in testing: 117 ids failed with "too
+// many SQL variables" while under 100 succeeded. Chunking keeps every batch
+// safely under that regardless of exactly where D1's real limit sits. This
+// wasn't reachable until this session's testing pushed the local account
+// count past it — admin's Users/Trades lists call this with every account
+// id on the page (up to 500), so it's a real production concern once
+// SwapDeck has more than a hundred or so users, not just a local-dev
+// artifact.
+const MAX_IDS_PER_QUERY = 90
+
 // Batched, not one query per account — a Matches or admin list can show
 // dozens of accounts at once. Returns a Map keyed by account id; an id
 // with no ratings simply isn't in the map, so callers default to "no
@@ -10,21 +21,24 @@ export async function getRatingSummaries(env, accountIds) {
   const ids = [...new Set(accountIds)].filter(Boolean)
   if (ids.length === 0) return summaries
 
-  const placeholders = ids.map(() => '?').join(', ')
-  const rows = await env.DB.prepare(
-    `SELECT rated_account_id, COUNT(*) AS total, SUM(thumbs_up) AS positive
-     FROM trade_ratings
-     WHERE rated_account_id IN (${placeholders})
-     GROUP BY rated_account_id`,
-  )
-    .bind(...ids)
-    .all()
+  for (let i = 0; i < ids.length; i += MAX_IDS_PER_QUERY) {
+    const chunk = ids.slice(i, i + MAX_IDS_PER_QUERY)
+    const placeholders = chunk.map(() => '?').join(', ')
+    const rows = await env.DB.prepare(
+      `SELECT rated_account_id, COUNT(*) AS total, SUM(thumbs_up) AS positive
+       FROM trade_ratings
+       WHERE rated_account_id IN (${placeholders})
+       GROUP BY rated_account_id`,
+    )
+      .bind(...chunk)
+      .all()
 
-  for (const row of rows.results) {
-    summaries.set(row.rated_account_id, {
-      positivePct: Math.round((row.positive / row.total) * 100),
-      count: row.total,
-    })
+    for (const row of rows.results) {
+      summaries.set(row.rated_account_id, {
+        positivePct: Math.round((row.positive / row.total) * 100),
+        count: row.total,
+      })
+    }
   }
   return summaries
 }

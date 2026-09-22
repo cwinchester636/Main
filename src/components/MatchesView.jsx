@@ -52,6 +52,7 @@ function MatchCard({ match, isProposed, onPropose, onBlock, token, isSuspended }
         <span className="match-summary-text">
           <span className="match-name-row">
             <strong>{account.username}</strong>
+            {account.isPro && <span className="pro-badge">⭐ Pro</span>}
             <RatingBadge rating={account.rating} />
             {proximityLabel && <span className="match-distance">{proximityLabel}</span>}
           </span>

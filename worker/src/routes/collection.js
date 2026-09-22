@@ -1,4 +1,4 @@
-import { error, json, newId, matchKey, servePhoto } from '../utils.js'
+import { error, json, newId, matchKey, servePhoto, isPro, FREE_COLLECTION_LIMIT } from '../utils.js'
 import { isAdminUsername } from '../admin.js'
 import { notifyNewMatches } from './matchAlerts.js'
 
@@ -63,6 +63,24 @@ export async function addCollectionItem(request, env, account, ctx) {
   const listType = form.get('listType')
   if (listType !== 'have' && listType !== 'want') {
     return error('listType must be "have" or "want"')
+  }
+
+  // Free-tier collection cap — checked before any photo upload work, so a
+  // card that's going to be rejected anyway never costs a KV write. Removing
+  // a card to make room always works regardless of tier; this only blocks
+  // growing past the limit. See README "Pro tier / paywall".
+  if (!isPro(account)) {
+    const { n: existingCount } = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM collection_items WHERE account_id = ? AND list_type = ?',
+    )
+      .bind(account.id, listType)
+      .first()
+    if (existingCount >= FREE_COLLECTION_LIMIT) {
+      return error(
+        `free accounts can have up to ${FREE_COLLECTION_LIMIT} cards in ${listType === 'have' ? 'Haves' : 'Wants'} — upgrade to Pro for unlimited`,
+        403,
+      )
+    }
   }
 
   let card

@@ -1,5 +1,5 @@
 import { buildPushPayload } from '@block65/webcrypto-web-push'
-import { error, json, newId } from './utils.js'
+import { error, json, newId, isPro } from './utils.js'
 
 // Notifications are best-effort, never load-bearing -- every trigger site
 // wraps this in ctx.waitUntil() and nothing here ever throws back into the
@@ -13,6 +13,12 @@ function vapidKeys(env) {
 }
 
 export async function subscribe(request, env, account) {
+  // Push notifications are a Pro perk -- everyone still gets the in-app
+  // notifications inbox regardless (notifyAccount below writes that
+  // unconditionally), this only blocks the browser/device push channel on
+  // top of it. See README "Pro tier / paywall".
+  if (!isPro(account)) return error('push notifications are a Pro feature — upgrade to enable them', 403)
+
   const body = await request.json().catch(() => null)
   const endpoint = typeof body?.endpoint === 'string' ? body.endpoint : ''
   const p256dh = typeof body?.keys?.p256dh === 'string' ? body.keys.p256dh : ''

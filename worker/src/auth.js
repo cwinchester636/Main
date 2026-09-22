@@ -1,4 +1,4 @@
-import { hashToken } from './utils.js'
+import { hashToken, isPro } from './utils.js'
 
 export async function authenticate(request, env) {
   const header = request.headers.get('Authorization') || ''
@@ -21,5 +21,6 @@ export function publicAccount(row) {
     zip: row.zip,
     radiusMiles: row.radius_miles ?? null,
     isSuspended: !!row.suspended_at,
+    isPro: isPro(row),
   }
 }

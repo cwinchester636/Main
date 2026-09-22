@@ -1,4 +1,4 @@
-import { error, json, newId, generateToken, hashToken, hashPassword, verifyPassword } from '../utils.js'
+import { error, json, newId, generateToken, hashToken, hashPassword, verifyPassword, isPro, FREE_MAX_RADIUS_MILES } from '../utils.js'
 import { publicAccount } from '../auth.js'
 import { geocodeZip } from '../geocode.js'
 import { isAdminUsername } from '../admin.js'
@@ -41,8 +41,18 @@ export async function createAccount(request, env) {
 
   const avatar = typeof body.avatar === 'string' && body.avatar ? body.avatar : '🙂'
   const zip = typeof body.zip === 'string' && body.zip.trim() ? body.zip.trim() : null
-  const radiusMiles = parseRadius(body, null)
+  // Defaults to the free-tier cap, not "any distance" -- a brand-new
+  // account is never Pro, so falling back to unlimited here would let
+  // every signup start past the limit updateMe otherwise enforces. See
+  // README "Pro tier / paywall".
+  const radiusMiles = parseRadius(body, FREE_MAX_RADIUS_MILES)
   if (radiusMiles === undefined) return error(`radiusMiles must be one of ${RADIUS_OPTIONS.join(', ')}, or null`)
+  if (radiusMiles === null || radiusMiles > FREE_MAX_RADIUS_MILES) {
+    return error(
+      `free accounts can search up to ${FREE_MAX_RADIUS_MILES} miles — upgrade to Pro for unlimited search radius`,
+      403,
+    )
+  }
 
   const existingUsername = await env.DB.prepare('SELECT id FROM accounts WHERE username = ?').bind(username).first()
   if (existingUsername) return error('that username is taken', 409)
@@ -77,7 +87,10 @@ export async function createAccount(request, env) {
     )
     .run()
 
-  return json({ account: { id, username, email, avatar, zip, radiusMiles, isAdmin: isAdminUsername(username, env) }, token }, 201)
+  return json(
+    { account: { id, username, email, avatar, zip, radiusMiles, isAdmin: isAdminUsername(username, env), isPro: false }, token },
+    201,
+  )
 }
 
 // Logging in issues a *new* token and overwrites the account's stored one
@@ -122,6 +135,17 @@ export async function updateMe(request, env, account) {
   const radiusMiles = parseRadius(body, account.radius_miles)
   if (radiusMiles === undefined) return error(`radiusMiles must be one of ${RADIUS_OPTIONS.join(', ')}, or null`)
 
+  // "Any distance" (null) and radii beyond FREE_MAX_RADIUS_MILES are a Pro
+  // perk — free accounts can still narrow their radius as much as they
+  // like, this only stops them widening it past the cap. See README "Pro
+  // tier / paywall".
+  if (!isPro(account) && (radiusMiles === null || radiusMiles > FREE_MAX_RADIUS_MILES)) {
+    return error(
+      `free accounts can search up to ${FREE_MAX_RADIUS_MILES} miles — upgrade to Pro for unlimited search radius`,
+      403,
+    )
+  }
+
   // Only re-geocode when the ZIP actually changed — avoids an external call
   // (and its latency/failure risk) on every unrelated profile save.
   const zipChanged = zip !== account.zip
@@ -140,6 +164,7 @@ export async function updateMe(request, env, account) {
       zip,
       radiusMiles,
       isAdmin: isAdminUsername(account.username, env),
+      isPro: isPro(account),
     },
   })
 }

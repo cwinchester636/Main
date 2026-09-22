@@ -35,6 +35,20 @@ export function requireNotSuspended(account) {
     : null
 }
 
+// Nullable timestamp, same convention as suspended_at above: null means
+// never/no-longer Pro, a future timestamp means active Pro until then (past
+// means it lapsed — no separate cleanup needed, this check alone handles
+// expiry). See README "Pro tier / paywall".
+export function isPro(row) {
+  return !!row.pro_until && row.pro_until > Date.now()
+}
+
+// Free-tier limits enforced server-side wherever they matter — see
+// addCollectionItem (collection.js), updateMe (accounts.js), and subscribe
+// (push.js). Never trust a client-side check alone for these.
+export const FREE_COLLECTION_LIMIT = 25
+export const FREE_MAX_RADIUS_MILES = 100
+
 export function newId() {
   return crypto.randomUUID()
 }

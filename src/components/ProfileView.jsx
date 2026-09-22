@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import AvatarPicker from './AvatarPicker.jsx'
+import PaywallModal from './PaywallModal.jsx'
 import { api, ApiError } from '../api/client.js'
 import {
   getExistingSubscription,
@@ -8,10 +9,12 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from '../utils/push.js'
+import { FREE_MAX_RADIUS_MILES } from '../utils/entitlements.js'
 
 const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250]
 
 export default function ProfileView({ account, token, onUpdate, onLogOut, onToggleBlock }) {
+  const [paywallReason, setPaywallReason] = useState(null)
   const [avatar, setAvatar] = useState(account.avatar)
   const [zip, setZip] = useState(account.zip || '')
   const [radiusMiles, setRadiusMiles] = useState(account.radiusMiles ?? null)
@@ -111,7 +114,23 @@ export default function ProfileView({ account, token, onUpdate, onLogOut, onTogg
   return (
     <div className="view">
       <h1>Profile</h1>
-      <p className="view-subtitle">@{account.username} — this is how other collectors see you.</p>
+      <p className="view-subtitle">
+        @{account.username} {account.isPro && <span className="pro-badge">⭐ Pro</span>} — this is how other
+        collectors see you.
+      </p>
+
+      {!account.isPro && (
+        <div className="profile-section">
+          <h2>Your plan</h2>
+          <p className="section-hint">
+            Free — up to {FREE_MAX_RADIUS_MILES} mile search radius and 25 cards per list. Pro removes those limits
+            and unlocks push notifications and a Pro badge.
+          </p>
+          <button type="button" className="button secondary" onClick={() => setPaywallReason('')}>
+            See Pro benefits
+          </button>
+        </div>
+      )}
 
       <p className="field-label">Email</p>
       <p className="profile-email">{account.email || 'Not set (this account predates email/password login)'}</p>
@@ -131,11 +150,20 @@ export default function ProfileView({ account, token, onUpdate, onLogOut, onTogg
         id="profile-radius"
         className="text-input"
         value={radiusMiles ?? 'any'}
-        onChange={(e) => setRadiusMiles(e.target.value === 'any' ? null : Number(e.target.value))}
+        onChange={(e) => {
+          const next = e.target.value === 'any' ? null : Number(e.target.value)
+          if (!account.isPro && (next === null || next > FREE_MAX_RADIUS_MILES)) {
+            setPaywallReason(`Free accounts can search up to ${FREE_MAX_RADIUS_MILES} miles.`)
+            return
+          }
+          setRadiusMiles(next)
+        }}
       >
-        <option value="any">Any distance</option>
+        <option value="any">Any distance{!account.isPro ? ' (Pro)' : ''}</option>
         {RADIUS_OPTIONS.map((mi) => (
-          <option key={mi} value={mi}>Within {mi} miles</option>
+          <option key={mi} value={mi}>
+            Within {mi} miles{!account.isPro && mi > FREE_MAX_RADIUS_MILES ? ' (Pro)' : ''}
+          </option>
         ))}
       </select>
       <p className="section-hint">
@@ -155,19 +183,37 @@ export default function ProfileView({ account, token, onUpdate, onLogOut, onTogg
 
       <div className="profile-section">
         <h2>Notifications</h2>
-        {pushState === 'unsupported' && (
-          <p className="section-hint">This browser doesn't support push notifications.</p>
-        )}
-        {pushState === 'checking' && <p className="section-hint">Checking…</p>}
-        {pushState === 'off' && (
+        {!account.isPro ? (
           <>
             <p className="section-hint">
-              Get notified about new matches, new trade proposals, accepted trades, completed trades, new
-              messages, and local events posted near you — even when SwapDeck isn't open.
+              Push notifications for new matches, trades, and events are a Pro feature — you'll still see
+              everything in the notifications inbox (🔔 above) either way.
             </p>
-            <button type="button" className="button secondary" disabled={pushBusy} onClick={handleEnablePush}>
-              {pushBusy ? 'Enabling…' : 'Enable notifications'}
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => setPaywallReason('Push notifications are a Pro feature.')}
+            >
+              🔒 See Pro benefits
             </button>
+          </>
+        ) : (
+          <>
+            {pushState === 'unsupported' && (
+              <p className="section-hint">This browser doesn't support push notifications.</p>
+            )}
+            {pushState === 'checking' && <p className="section-hint">Checking…</p>}
+            {pushState === 'off' && (
+              <>
+                <p className="section-hint">
+                  Get notified about new matches, new trade proposals, accepted trades, completed trades, new
+                  messages, and local events posted near you — even when SwapDeck isn't open.
+                </p>
+                <button type="button" className="button secondary" disabled={pushBusy} onClick={handleEnablePush}>
+                  {pushBusy ? 'Enabling…' : 'Enable notifications'}
+                </button>
+              </>
+            )}
           </>
         )}
         {pushState === 'on' && (
@@ -239,6 +285,8 @@ export default function ProfileView({ account, token, onUpdate, onLogOut, onTogg
           Log out
         </button>
       </div>
+
+      {paywallReason !== null && <PaywallModal reason={paywallReason} onClose={() => setPaywallReason(null)} />}
     </div>
   )
 }
