@@ -53,6 +53,7 @@ export const api = {
   login: (body) => request('/api/login', { method: 'POST', body }),
   getMe: (token) => request('/api/me', { token }),
   updateMe: (token, body) => request('/api/me', { method: 'PATCH', token, body }),
+  verifyProPurchase: (token) => request('/api/me/pro/verify', { method: 'POST', token }),
 
   getCollection: (token) => request('/api/collection', { token }),
   addCollectionItem: (token, listType, card, photo) => {

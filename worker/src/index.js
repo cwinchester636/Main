@@ -12,6 +12,7 @@ import { subscribe, unsubscribe } from './push.js'
 import { listEvents, createEvent, deleteEvent, toggleRsvp } from './routes/events.js'
 import { listNotifications, markNotificationsRead } from './routes/notifications.js'
 import { listBlocked, toggleBlock } from './routes/blocks.js'
+import { verifyProPurchase } from './routes/purchases.js'
 
 export default {
   async fetch(request, env, ctx) {
@@ -35,6 +36,7 @@ export default {
 
       if (path === '/api/me' && request.method === 'GET') return getMe(account, env)
       if (path === '/api/me' && request.method === 'PATCH') return await updateMe(request, env, account)
+      if (path === '/api/me/pro/verify' && request.method === 'POST') return await verifyProPurchase(env, account)
 
       if (path === '/api/collection' && request.method === 'GET') return await getCollection(env, account)
       if (path === '/api/collection' && request.method === 'POST') {

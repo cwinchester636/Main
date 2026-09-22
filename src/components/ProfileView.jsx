@@ -13,7 +13,7 @@ import { FREE_MAX_RADIUS_MILES } from '../utils/entitlements.js'
 
 const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250]
 
-export default function ProfileView({ account, token, onUpdate, onLogOut, onToggleBlock }) {
+export default function ProfileView({ account, token, onUpdate, onLogOut, onToggleBlock, onPurchased }) {
   const [paywallReason, setPaywallReason] = useState(null)
   const [avatar, setAvatar] = useState(account.avatar)
   const [zip, setZip] = useState(account.zip || '')
@@ -286,7 +286,15 @@ export default function ProfileView({ account, token, onUpdate, onLogOut, onTogg
         </button>
       </div>
 
-      {paywallReason !== null && <PaywallModal reason={paywallReason} onClose={() => setPaywallReason(null)} />}
+      {paywallReason !== null && (
+        <PaywallModal
+          reason={paywallReason}
+          accountId={account.id}
+          token={token}
+          onPurchased={onPurchased}
+          onClose={() => setPaywallReason(null)}
+        />
+      )}
     </div>
   )
 }

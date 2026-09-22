@@ -5,7 +5,7 @@ import PhotoViewerModal from './PhotoViewerModal.jsx'
 import PaywallModal from './PaywallModal.jsx'
 import { FREE_COLLECTION_LIMIT } from '../utils/entitlements.js'
 
-function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove, onViewPhoto, isPro }) {
+function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove, onViewPhoto, isPro, accountId, token, onPurchased }) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -71,6 +71,9 @@ function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove
       {paywallOpen && (
         <PaywallModal
           reason={`Free accounts can have up to ${FREE_COLLECTION_LIMIT} cards in ${title.toLowerCase()}.`}
+          accountId={accountId}
+          token={token}
+          onPurchased={onPurchased}
           onClose={() => setPaywallOpen(false)}
         />
       )}
@@ -78,7 +81,7 @@ function CardSection({ title, hint, listType, cards, otherCards, onAdd, onRemove
   )
 }
 
-export default function CollectionView({ haves, wants, onAdd, onRemove, token, isPro }) {
+export default function CollectionView({ haves, wants, onAdd, onRemove, token, account, onPurchased }) {
   const [viewingPhotoId, setViewingPhotoId] = useState(null)
 
   return (
@@ -97,7 +100,10 @@ export default function CollectionView({ haves, wants, onAdd, onRemove, token, i
         onAdd={onAdd}
         onRemove={onRemove}
         onViewPhoto={setViewingPhotoId}
-        isPro={isPro}
+        isPro={account.isPro}
+        accountId={account.id}
+        token={token}
+        onPurchased={onPurchased}
       />
 
       <CardSection
@@ -106,7 +112,10 @@ export default function CollectionView({ haves, wants, onAdd, onRemove, token, i
         listType="want"
         cards={wants}
         otherCards={haves}
-        isPro={isPro}
+        isPro={account.isPro}
+        accountId={account.id}
+        token={token}
+        onPurchased={onPurchased}
         onAdd={onAdd}
         onRemove={onRemove}
       />

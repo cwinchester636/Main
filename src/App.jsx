@@ -105,6 +105,15 @@ export default function App() {
     setAccount(updated)
   }
 
+  // Re-fetches rather than trusting a locally-computed isPro -- after a
+  // purchase, the source of truth is what the server just verified against
+  // RevenueCat (see api.verifyProPurchase / PaywallModal), not anything the
+  // client concluded on its own.
+  const refreshAccount = async () => {
+    const { account: fresh } = await api.getMe(token)
+    setAccount(fresh)
+  }
+
   const logOut = () => {
     setToken(null)
     setAccount(null)
@@ -203,7 +212,8 @@ export default function App() {
               onAdd={addCard}
               onRemove={removeCard}
               token={token}
-              isPro={account.isPro}
+              account={account}
+              onPurchased={refreshAccount}
             />
           )}
           {tab === 'matches' && (
@@ -250,6 +260,7 @@ export default function App() {
               onUpdate={updateProfile}
               onLogOut={logOut}
               onToggleBlock={toggleBlock}
+              onPurchased={refreshAccount}
             />
           )}
         </main>
