@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SwapDeck</string>
+    <string name="title_activity_main">SwapDeck</string>
+    <string name="package_name">cards.swapdeck.app</string>
+    <string name="custom_url_scheme">cards.swapdeck.app</string>
+</resources>
