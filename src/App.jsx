@@ -128,6 +128,16 @@ export default function App() {
     setAuthStatus('anonymous')
   }
 
+  // Called after ProfileView has already told the server to delete the
+  // account (see api.deleteMyAccount) -- this just clears local state so
+  // the app falls back to Onboarding, same as logOut but with no session
+  // left on the server to end.
+  const deleteAccount = () => {
+    setToken(null)
+    setAccount(null)
+    setAuthStatus('anonymous')
+  }
+
   const proposeTrade = async (toAccountId, cashAmount) => {
     await api.proposeTrade(token, toAccountId, cashAmount)
     const tradeData = await api.getTrades(token)
@@ -267,6 +277,7 @@ export default function App() {
               token={token}
               onUpdate={updateProfile}
               onLogOut={logOut}
+              onDeleteAccount={deleteAccount}
               onToggleBlock={toggleBlock}
               onPurchased={refreshAccount}
             />

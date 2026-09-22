@@ -95,43 +95,40 @@ export async function setUserPro(request, env, account, targetId) {
   return json({ id: targetId, isPro: body.pro, proUntil })
 }
 
-export async function deleteUser(env, account, targetId) {
-  if (targetId === account.id) {
-    return error('cannot delete your own account from the admin panel — log out instead', 400)
-  }
-
-  const target = await env.DB.prepare('SELECT id FROM accounts WHERE id = ?').bind(targetId).first()
-  if (!target) return error('user not found', 404)
-
-  // Explicit cascade rather than relying on collection_items/trade_proposals/
-  // trade_snapshot_items/trade_messages/trade_reports/trade_ratings/
-  // push_subscriptions/known_matches/local_events/notifications/event_rsvps/
-  // account_blocks' ON DELETE CASCADE foreign keys actually being enforced
-  // — SQLite (and by extension D1) only enforces FK constraints when
-  // foreign_keys is turned on for the connection, which nothing in this
-  // codebase does, so this can't assume it's active. Everything
-  // trade_id-scoped goes first since it references trade_proposals rows
-  // this same batch deletes right after — scoping by "any trade this
-  // account was ever a party to" also correctly covers every
-  // message/report/rating they were involved in, since a rating's rater
-  // and rated account are always the trade's two participants, same as
-  // messages/reports only ever happening on your own trade. event_rsvps
-  // is deleted two ways for the same reason: this account's own RSVPs to
-  // anyone's events, and (before local_events itself is deleted, since D1
-  // batches run sequentially in one transaction) every RSVP anyone else
-  // left on an event *this* account created — otherwise those would be
-  // orphaned the moment the event row under them disappears.
-  // account_blocks is scoped by either column since a block is
-  // directional — this account might be the blocker or the blocked.
-  // referred_by_account_id on any account this one referred is cleared
-  // (not deleted — the referred account itself is a real, separate
-  // account and stays) rather than left pointing at a now-nonexistent id,
-  // same "explicit, not relying on the unenforced ON DELETE SET NULL"
-  // reasoning as everything else here. sessions (see migrations/
-  // 0022_sessions.sql) is deleted by account_id, not by any specific
-  // token — every device this account was ever logged into loses access
-  // the moment the account itself is gone, which is the correct behavior
-  // regardless of how many sessions existed.
+// Explicit cascade rather than relying on collection_items/trade_proposals/
+// trade_snapshot_items/trade_messages/trade_reports/trade_ratings/
+// push_subscriptions/known_matches/local_events/notifications/event_rsvps/
+// account_blocks' ON DELETE CASCADE foreign keys actually being enforced
+// — SQLite (and by extension D1) only enforces FK constraints when
+// foreign_keys is turned on for the connection, which nothing in this
+// codebase does, so this can't assume it's active. Everything
+// trade_id-scoped goes first since it references trade_proposals rows
+// this same batch deletes right after — scoping by "any trade this
+// account was ever a party to" also correctly covers every
+// message/report/rating they were involved in, since a rating's rater
+// and rated account are always the trade's two participants, same as
+// messages/reports only ever happening on your own trade. event_rsvps
+// is deleted two ways for the same reason: this account's own RSVPs to
+// anyone's events, and (before local_events itself is deleted, since D1
+// batches run sequentially in one transaction) every RSVP anyone else
+// left on an event *this* account created — otherwise those would be
+// orphaned the moment the event row under them disappears.
+// account_blocks is scoped by either column since a block is
+// directional — this account might be the blocker or the blocked.
+// referred_by_account_id on any account this one referred is cleared
+// (not deleted — the referred account itself is a real, separate
+// account and stays) rather than left pointing at a now-nonexistent id,
+// same "explicit, not relying on the unenforced ON DELETE SET NULL"
+// reasoning as everything else here. sessions (see migrations/
+// 0022_sessions.sql) is deleted by account_id, not by any specific
+// token — every device this account was ever logged into loses access
+// the moment the account itself is gone, which is the correct behavior
+// regardless of how many sessions existed.
+//
+// Shared by the admin delete-any-user route and the self-service
+// delete-my-own-account route (worker/src/routes/accounts.js) — one
+// tested cascade, not two copies that could drift apart.
+export async function deleteAccountCascade(env, targetId) {
   await env.DB.batch([
     env.DB.prepare('UPDATE accounts SET referred_by_account_id = NULL WHERE referred_by_account_id = ?').bind(
       targetId,
@@ -173,6 +170,17 @@ export async function deleteUser(env, account, targetId) {
     ),
     env.DB.prepare('DELETE FROM accounts WHERE id = ?').bind(targetId),
   ])
+}
+
+export async function deleteUser(env, account, targetId) {
+  if (targetId === account.id) {
+    return error('cannot delete your own account from the admin panel — use Profile → Delete my account instead', 400)
+  }
+
+  const target = await env.DB.prepare('SELECT id FROM accounts WHERE id = ?').bind(targetId).first()
+  if (!target) return error('user not found', 404)
+
+  await deleteAccountCascade(env, targetId)
 
   return json({ deleted: targetId })
 }

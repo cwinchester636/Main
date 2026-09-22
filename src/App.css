@@ -1067,6 +1067,21 @@
   margin: 0 0 4px;
 }
 
+.checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.checkbox-field input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
 /* Onboarding */
 .onboarding {
   width: 100%;

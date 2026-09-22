@@ -13,6 +13,7 @@ import {
 import { publicAccount, getTokenHash } from '../auth.js'
 import { geocodeZip } from '../geocode.js'
 import { isAdminUsername } from '../admin.js'
+import { deleteAccountCascade } from './admin.js'
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/
 // Deliberately permissive — this only rejects obviously-malformed input
@@ -87,6 +88,14 @@ export async function createAccount(request, env) {
   const password = typeof body.password === 'string' ? body.password : ''
   if (password.length < MIN_PASSWORD_LENGTH) {
     return error(`password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+  }
+
+  // SwapDeck facilitates in-person meetups with strangers and takes real
+  // payments (Pro tier) -- both are why this is 18+, not just an under-13
+  // COPPA line. The checkbox is client-side UX; this is the actual gate,
+  // since nothing client-side can be trusted to have really been checked.
+  if (body.ageConfirmed !== true) {
+    return error('you must confirm you are at least 18 years old to create an account')
   }
 
   const avatar = typeof body.avatar === 'string' && body.avatar ? body.avatar : '🙂'
@@ -170,6 +179,7 @@ export async function createAccount(request, env) {
         isAdmin: isAdminUsername(username, env),
         isPro: false,
         referralRewardsGranted: 0,
+        hasPassword: true,
       },
       token,
     },
@@ -272,4 +282,32 @@ export async function updateMe(request, env, account) {
       referralRewardsGranted: account.referral_rewards_granted ?? 0,
     },
   })
+}
+
+// Self-service account deletion — required by Google Play's policy that any
+// app allowing account creation must also let a user delete that account
+// and its data from within the app itself, not only by contacting support
+// for an admin to handle manually (which is all deleteUser in admin.js
+// offers). See README "Account deletion".
+//
+// Requires re-entering the password, unlike every other self-service
+// action in this app — this one is irreversible and destroys real data
+// (collection, trade history, everything), so it gets the same "prove you
+// really are the account holder, not just someone holding an unlocked
+// phone" bar as changing something security-sensitive would elsewhere.
+// Accounts with no password set (pre-password-auth legacy accounts, see
+// "Accounts & auth") have nothing to verify against, so the check is
+// skipped for them rather than permanently locking them out of ever
+// deleting their own account.
+export async function deleteMyAccount(request, env, account) {
+  if (account.password_hash) {
+    const body = await request.json().catch(() => null)
+    const password = typeof body?.password === 'string' ? body.password : ''
+    if (!password || !(await verifyPassword(password, account.password_salt, account.password_hash))) {
+      return error('incorrect password', 401)
+    }
+  }
+
+  await deleteAccountCascade(env, account.id)
+  return json({ deleted: account.id })
 }

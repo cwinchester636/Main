@@ -40,5 +40,6 @@ export function publicAccount(row) {
     isSuspended: !!row.suspended_at,
     isPro: isPro(row),
     referralRewardsGranted: row.referral_rewards_granted ?? 0,
+    hasPassword: !!row.password_hash,
   }
 }

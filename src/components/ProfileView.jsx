@@ -13,7 +13,7 @@ import { FREE_MAX_RADIUS_MILES } from '../utils/entitlements.js'
 
 const RADIUS_OPTIONS = [5, 10, 25, 50, 100, 250]
 
-export default function ProfileView({ account, token, onUpdate, onLogOut, onToggleBlock, onPurchased }) {
+export default function ProfileView({ account, token, onUpdate, onLogOut, onDeleteAccount, onToggleBlock, onPurchased }) {
   const [paywallReason, setPaywallReason] = useState(null)
   const [avatar, setAvatar] = useState(account.avatar)
   const [zip, setZip] = useState(account.zip || '')
@@ -21,6 +21,25 @@ export default function ProfileView({ account, token, onUpdate, onLogOut, onTogg
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Delete your account? This permanently erases your collection, trade history, and matches. This can’t be undone.')) {
+      return
+    }
+    setDeleteError('')
+    setDeleting(true)
+    try {
+      await api.deleteMyAccount(token, deletePassword)
+      onDeleteAccount()
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
+      setDeleting(false)
+    }
+  }
 
   const [blockedUsers, setBlockedUsers] = useState(null)
   const [unblockingId, setUnblockingId] = useState(null)
@@ -329,7 +348,30 @@ export default function ProfileView({ account, token, onUpdate, onLogOut, onTogg
         </button>
       </div>
 
+      <div className="danger-zone">
+        <h2>Delete my account</h2>
+        <p className="section-hint">
+          Permanently deletes your account, collection, trade history, matches, and messages. This can't be undone.
+        </p>
+        {account.hasPassword && (
+          <input
+            type="password"
+            className="text-input"
+            value={deletePassword}
+            onChange={(e) => setDeletePassword(e.target.value)}
+            placeholder="Confirm your password"
+            autoComplete="current-password"
+          />
+        )}
+        {deleteError && <p className="form-error">{deleteError}</p>}
+        <button type="button" className="button danger" disabled={deleting} onClick={handleDeleteAccount}>
+          {deleting ? 'Deleting…' : 'Delete my account'}
+        </button>
+      </div>
+
       <p className="section-hint">
+        <a href="https://swapdeck.cards/terms.html" target="_blank" rel="noreferrer">Terms of Service</a>
+        {' · '}
         <a href="https://swapdeck.cards/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>
       </p>
 

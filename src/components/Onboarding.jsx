@@ -20,6 +20,7 @@ function SignupForm({ onComplete, onSwitchToLogin }) {
   const [referredByUsername, setReferredByUsername] = useState(
     () => new URLSearchParams(window.location.search).get('ref') || '',
   )
+  const [ageConfirmed, setAgeConfirmed] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -41,6 +42,10 @@ function SignupForm({ onComplete, onSwitchToLogin }) {
       setError('Passwords don’t match.')
       return
     }
+    if (!ageConfirmed) {
+      setError('You must confirm you are at least 18 years old to create an account.')
+      return
+    }
     setError('')
     setSubmitting(true)
     try {
@@ -51,6 +56,7 @@ function SignupForm({ onComplete, onSwitchToLogin }) {
         avatar,
         zip: zip.trim(),
         referredByUsername: referredByUsername.trim() || undefined,
+        ageConfirmed,
       })
       onComplete({ account, token })
     } catch (err) {
@@ -125,6 +131,15 @@ function SignupForm({ onComplete, onSwitchToLogin }) {
       <p className="field-label">Pick an avatar</p>
       <AvatarPicker value={avatar} onChange={setAvatar} />
 
+      <label className="checkbox-field">
+        <input
+          type="checkbox"
+          checked={ageConfirmed}
+          onChange={(e) => setAgeConfirmed(e.target.checked)}
+        />
+        <span>I confirm I am at least 18 years old.</span>
+      </label>
+
       {error && <p className="form-error">{error}</p>}
 
       <button type="submit" className="button primary full" disabled={submitting}>
@@ -133,6 +148,7 @@ function SignupForm({ onComplete, onSwitchToLogin }) {
 
       <p className="section-hint">
         By creating an account, you agree to our{' '}
+        <a href="https://swapdeck.cards/terms.html" target="_blank" rel="noreferrer">Terms of Service</a> and{' '}
         <a href="https://swapdeck.cards/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>.
       </p>
 
