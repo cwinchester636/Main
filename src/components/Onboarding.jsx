@@ -114,6 +114,11 @@ function SignupForm({ onComplete, onSwitchToLogin }) {
         {submitting ? 'Creating account…' : 'Create account'}
       </button>
 
+      <p className="section-hint">
+        By creating an account, you agree to our{' '}
+        <a href="https://swapdeck.cards/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>.
+      </p>
+
       <p className="auth-switch">
         Already have an account?{' '}
         <button type="button" className="link-button" onClick={onSwitchToLogin}>Log in</button>

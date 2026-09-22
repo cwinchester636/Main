@@ -286,6 +286,10 @@ export default function ProfileView({ account, token, onUpdate, onLogOut, onTogg
         </button>
       </div>
 
+      <p className="section-hint">
+        <a href="https://swapdeck.cards/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>
+      </p>
+
       {paywallReason !== null && (
         <PaywallModal
           reason={paywallReason}
