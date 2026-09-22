@@ -22,5 +22,6 @@ export function publicAccount(row) {
     radiusMiles: row.radius_miles ?? null,
     isSuspended: !!row.suspended_at,
     isPro: isPro(row),
+    referralRewardsGranted: row.referral_rewards_granted ?? 0,
   }
 }

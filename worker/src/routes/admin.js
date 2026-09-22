@@ -123,7 +123,15 @@ export async function deleteUser(env, account, targetId) {
   // orphaned the moment the event row under them disappears.
   // account_blocks is scoped by either column since a block is
   // directional — this account might be the blocker or the blocked.
+  // referred_by_account_id on any account this one referred is cleared
+  // (not deleted — the referred account itself is a real, separate
+  // account and stays) rather than left pointing at a now-nonexistent id,
+  // same "explicit, not relying on the unenforced ON DELETE SET NULL"
+  // reasoning as everything else here.
   await env.DB.batch([
+    env.DB.prepare('UPDATE accounts SET referred_by_account_id = NULL WHERE referred_by_account_id = ?').bind(
+      targetId,
+    ),
     env.DB.prepare('DELETE FROM collection_items WHERE account_id = ?').bind(targetId),
     env.DB.prepare('DELETE FROM push_subscriptions WHERE account_id = ?').bind(targetId),
     env.DB.prepare('DELETE FROM known_matches WHERE account_id_a = ? OR account_id_b = ?').bind(targetId, targetId),

@@ -78,7 +78,7 @@ export default {
       }
       const ratingMatch = path.match(/^\/api\/trades\/([^/]+)\/rating$/)
       if (ratingMatch && request.method === 'POST') {
-        return await rateTrade(request, env, account, ratingMatch[1])
+        return await rateTrade(request, env, account, ratingMatch[1], ctx)
       }
 
       const accountRatingsMatch = path.match(/^\/api\/accounts\/([^/]+)\/ratings$/)

@@ -26,6 +26,32 @@ export default function ProfileView({ account, token, onUpdate, onLogOut, onTogg
   const [unblockingId, setUnblockingId] = useState(null)
   const [blockedError, setBlockedError] = useState('')
 
+  const [shareCopied, setShareCopied] = useState(false)
+  const [shareError, setShareError] = useState('')
+
+  // Prefers the OS-native share sheet (works the same on the website and
+  // inside the Capacitor WebView on Android, no extra plugin needed) and
+  // falls back to copying the link when it's unavailable -- e.g. desktop
+  // browsers, which mostly don't implement navigator.share at all.
+  const handleShareInvite = async () => {
+    setShareError('')
+    const url = `https://swapdeck.cards/?ref=${encodeURIComponent(account.username)}`
+    const text = `Join me on SwapDeck to trade cards with nearby collectors! ${url}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'SwapDeck', text, url })
+        return
+      }
+      await navigator.clipboard.writeText(url)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2000)
+    } catch (err) {
+      // AbortError just means they closed the native share sheet without
+      // picking anything -- not a real failure worth showing an error for.
+      if (err?.name !== 'AbortError') setShareError('Could not share the invite link.')
+    }
+  }
+
   useEffect(() => {
     api
       .getBlockedUsers(token)
@@ -242,6 +268,23 @@ export default function ProfileView({ account, token, onUpdate, onLogOut, onTogg
             </ol>
           </div>
         )}
+      </div>
+
+      <div className="profile-section">
+        <h2>Invite friends</h2>
+        <p className="section-hint">
+          Share your invite link — when a friend you referred completes their first trade and gets a positive
+          rating, you both get a free month of Pro.
+        </p>
+        {account.referralRewardsGranted > 0 && (
+          <p className="form-success">
+            You've earned {account.referralRewardsGranted} free month{account.referralRewardsGranted === 1 ? '' : 's'} of Pro from referrals.
+          </p>
+        )}
+        {shareError && <p className="form-error">{shareError}</p>}
+        <button type="button" className="button secondary" onClick={handleShareInvite}>
+          {shareCopied ? 'Link copied!' : 'Share invite link'}
+        </button>
       </div>
 
       {blockedUsers && blockedUsers.length > 0 && (

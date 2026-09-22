@@ -14,6 +14,12 @@ function SignupForm({ onComplete, onSwitchToLogin }) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [zip, setZip] = useState('')
   const [avatar, setAvatar] = useState(ALL_AVATAR_ICONS[0].id)
+  // Pre-fills from a shared invite link (?ref=username), still editable --
+  // someone who was just told a friend's username in person can type it in
+  // just as easily as someone who tapped a link. See README "Referrals".
+  const [referredByUsername, setReferredByUsername] = useState(
+    () => new URLSearchParams(window.location.search).get('ref') || '',
+  )
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -44,6 +50,7 @@ function SignupForm({ onComplete, onSwitchToLogin }) {
         password,
         avatar,
         zip: zip.trim(),
+        referredByUsername: referredByUsername.trim() || undefined,
       })
       onComplete({ account, token })
     } catch (err) {
@@ -103,6 +110,16 @@ function SignupForm({ onComplete, onSwitchToLogin }) {
         value={zip}
         onChange={(e) => setZip(e.target.value)}
         placeholder="Used only to show how close a match is"
+      />
+
+      <label className="field-label" htmlFor="onboard-referred-by">Referred by (optional)</label>
+      <input
+        id="onboard-referred-by"
+        type="text"
+        className="text-input"
+        value={referredByUsername}
+        onChange={(e) => setReferredByUsername(e.target.value)}
+        placeholder="A friend's SwapDeck username"
       />
 
       <p className="field-label">Pick an avatar</p>

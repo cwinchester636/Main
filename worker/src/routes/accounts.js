@@ -1,4 +1,15 @@
-import { error, json, newId, generateToken, hashToken, hashPassword, verifyPassword, isPro, FREE_MAX_RADIUS_MILES } from '../utils.js'
+import {
+  error,
+  json,
+  newId,
+  generateToken,
+  hashToken,
+  hashPassword,
+  verifyPassword,
+  isPro,
+  FREE_MAX_RADIUS_MILES,
+  normalizeEmailForFraudCheck,
+} from '../utils.js'
 import { publicAccount } from '../auth.js'
 import { geocodeZip } from '../geocode.js'
 import { isAdminUsername } from '../admin.js'
@@ -20,6 +31,45 @@ function parseRadius(body, fallback) {
   if (body.radiusMiles === null) return null
   if (RADIUS_OPTIONS.includes(body.radiusMiles)) return body.radiusMiles
   return undefined
+}
+
+// Looks up a referral code (currently just the referrer's own username --
+// no separate invite-code scheme, one less thing to keep in sync) and
+// applies two fraud checks before crediting it, both deliberately silent
+// (a failed check just means no referral is recorded, never a signup
+// error -- see the caller). See README "Referrals" for why each one
+// exists:
+//   1. Same signup IP as the referrer -- most likely the same person
+//      signing up twice from their own device/network to farm the reward.
+//   2. Same Gmail mailbox as the referrer, or as another account this
+//      exact referrer has already been credited for, via the dot/+ trick
+//      (see normalizeEmailForFraudCheck) -- the same person posing as
+//      multiple "friends."
+// Neither check is foolproof (a determined fraudster can use two devices
+// and two real mailboxes), but both raise the cost of abuse well past
+// what a casual self-referral attempt would bother with, without ever
+// blocking a genuine signup over a false positive.
+async function resolveReferrer(env, request, body, newAccountEmail) {
+  const referredByUsername = typeof body.referredByUsername === 'string' ? body.referredByUsername.trim() : ''
+  if (!referredByUsername) return null
+
+  const referrer = await env.DB.prepare('SELECT id, email, signup_ip FROM accounts WHERE username = ?')
+    .bind(referredByUsername)
+    .first()
+  if (!referrer) return null
+
+  const signupIp = request.headers.get('CF-Connecting-IP') || null
+  if (signupIp && referrer.signup_ip && signupIp === referrer.signup_ip) return null
+
+  const normalizedNew = normalizeEmailForFraudCheck(newAccountEmail)
+  if (normalizedNew === normalizeEmailForFraudCheck(referrer.email)) return null
+
+  const siblings = await env.DB.prepare('SELECT email FROM accounts WHERE referred_by_account_id = ?')
+    .bind(referrer.id)
+    .all()
+  if (siblings.results.some((row) => normalizeEmailForFraudCheck(row.email) === normalizedNew)) return null
+
+  return referrer.id
 }
 
 export async function createAccount(request, env) {
@@ -60,6 +110,14 @@ export async function createAccount(request, env) {
   const existingEmail = await env.DB.prepare('SELECT id FROM accounts WHERE email = ?').bind(email).first()
   if (existingEmail) return error('an account with that email already exists', 409)
 
+  // Referral credit (see README "Referrals") is recorded, or silently
+  // dropped, here -- never surfaced as a signup error. A bad/nonexistent
+  // referral code, or one that fails a fraud check, should never block
+  // someone from actually creating an account; it should just mean nobody
+  // gets a reward for it.
+  const referredByAccountId = await resolveReferrer(env, request, body, email)
+  const signupIp = request.headers.get('CF-Connecting-IP') || null
+
   const id = newId()
   const token = generateToken()
   const tokenHash = await hashToken(token)
@@ -68,8 +126,8 @@ export async function createAccount(request, env) {
 
   await env.DB.prepare(
     `INSERT INTO accounts
-       (id, username, token_hash, email, password_hash, password_salt, avatar, zip, lat, lng, radius_miles, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, username, token_hash, email, password_hash, password_salt, avatar, zip, lat, lng, radius_miles, created_at, referred_by_account_id, signup_ip)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -84,11 +142,26 @@ export async function createAccount(request, env) {
       coords?.lng ?? null,
       radiusMiles,
       Date.now(),
+      referredByAccountId,
+      signupIp,
     )
     .run()
 
   return json(
-    { account: { id, username, email, avatar, zip, radiusMiles, isAdmin: isAdminUsername(username, env), isPro: false }, token },
+    {
+      account: {
+        id,
+        username,
+        email,
+        avatar,
+        zip,
+        radiusMiles,
+        isAdmin: isAdminUsername(username, env),
+        isPro: false,
+        referralRewardsGranted: 0,
+      },
+      token,
+    },
     201,
   )
 }
@@ -165,6 +238,7 @@ export async function updateMe(request, env, account) {
       radiusMiles,
       isAdmin: isAdminUsername(account.username, env),
       isPro: isPro(account),
+      referralRewardsGranted: account.referral_rewards_granted ?? 0,
     },
   })
 }

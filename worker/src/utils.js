@@ -49,6 +49,31 @@ export function isPro(row) {
 export const FREE_COLLECTION_LIMIT = 25
 export const FREE_MAX_RADIUS_MILES = 5
 
+// See worker/src/routes/accounts.js (recording a referral) and
+// worker/src/routes/ratings.js (granting the reward). REFERRAL_REWARD_CAP
+// bounds a single referrer's total lifetime payout even from real,
+// distinct referred accounts -- a ceiling on worst-case abuse, not a
+// substitute for the fraud checks at signup time.
+export const REFERRAL_REWARD_DAYS = 30
+export const REFERRAL_REWARD_CAP = 12
+
+// Gmail (and Google Workspace's own googlemail.com alias) ignores dots in
+// the local part and anything after a `+`, so "name@gmail.com",
+// "n.a.me@gmail.com", and "name+ref2@gmail.com" all deliver to the same
+// real inbox -- a well-known trick for making one person's signups look
+// like distinct "friends" to a referral system. Deliberately gmail-only:
+// other providers don't reliably share either convention, and normalizing
+// a provider that treats dots as significant would falsely collide two
+// real different mailboxes. Used only for the referral fraud check below,
+// never for login/uniqueness -- two accounts with dot-variant Gmail
+// addresses are still two genuinely separate accounts for every other
+// purpose in this app.
+export function normalizeEmailForFraudCheck(email) {
+  const [local, domain] = email.toLowerCase().split('@')
+  if (domain !== 'gmail.com' && domain !== 'googlemail.com') return email.toLowerCase()
+  return `${local.split('+')[0].replace(/\./g, '')}@gmail.com`
+}
+
 export function newId() {
   return crypto.randomUUID()
 }
